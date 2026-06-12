@@ -17,9 +17,14 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def get_db():
+    conn = sqlite3.connect('travel.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
 # ---------- 数据库初始化 ----------
 def init_db():
-    conn = sqlite3.connect('travel.db')
+    conn = get_db()
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS teams (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,9 +153,6 @@ TEAM_HTML = '''<!DOCTYPE html>
         .nav { margin-bottom: 15px; }
         a { color: #2196F3; text-decoration: none; }
         .trip-item { padding: 12px; margin: 8px 0; background: #f9f9f9; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .trip-item .status { font-size: 12px; padding: 4px 8px; border-radius: 10px; }
-        .status-active { background: #e8f5e9; color: #4CAF50; }
-        .status-archived { background: #eee; color: #999; }
     </style>
 </head>
 <body>
@@ -183,7 +185,7 @@ TEAM_HTML = '''<!DOCTYPE html>
             {% if t.status == 'active' %}
             <a href="/trip/{{ t.id }}"><button class="blue" style="width:auto; padding:8px 16px;">进入 →</button></a>
             {% else %}
-            <span class="status status-archived">已归档</span>
+            <span style="color:#999;">已归档</span>
             {% endif %}
         </div>
         {% endfor %}
@@ -237,7 +239,6 @@ TRIP_HTML = '''<!DOCTYPE html>
         <h2 style="display:inline; margin-left:10px;">🌴 {{ trip_name }}</h2>
     </div>
 
-    <!-- 记账 -->
     <div class="card">
         <h3>💰 记录垫付</h3>
         <form action="/trip/{{ trip_id }}/add_expense" method="post">
@@ -263,7 +264,6 @@ TRIP_HTML = '''<!DOCTYPE html>
         </form>
     </div>
 
-    <!-- 今日账单 + 清账 -->
     <div class="card">
         <h3>📋 今日账单 - {{ today }}</h3>
         {% for e in today_expenses %}
@@ -292,7 +292,6 @@ TRIP_HTML = '''<!DOCTYPE html>
         {% endif %}
     </div>
 
-    <!-- 清账历史 -->
     <div class="card">
         <h3>📅 清账历史</h3>
         {% for s in settlements %}
@@ -310,7 +309,6 @@ TRIP_HTML = '''<!DOCTYPE html>
         {% endif %}
     </div>
 
-    <!-- 足迹地图 -->
     <div class="card">
         <h3>🗺️ 足迹地图</h3>
         <div id="map"></div>
@@ -345,7 +343,6 @@ TRIP_HTML = '''<!DOCTYPE html>
         </div>
     </div>
 
-    <!-- 旅行日志 -->
     <div class="card">
         <h3>📝 旅行日志</h3>
         <form action="/trip/{{ trip_id }}/add_log" method="post" enctype="multipart/form-data">
@@ -375,7 +372,7 @@ TRIP_HTML = '''<!DOCTYPE html>
     </div>
 
     <form action="/trip/{{ trip_id }}/end" method="post" style="margin:15px 0;">
-        <button class="red" type="submit" onclick="return confirm('确定结束这次旅途吗？所有记录将被保存。')">🏁 结束旅途并归档</button>
+        <button class="red" type="submit" onclick="return confirm('确定结束这次旅途吗？')">🏁 结束旅途并归档</button>
     </form>
 
     <script>
@@ -416,11 +413,11 @@ def create():
     team = request.form.get('team', '').strip()
     if not team:
         return "团队名不能为空", 400
-    conn = sqlite3.connect('travel.db')
+    conn = get_db()
     try:
         conn.execute('INSERT INTO teams (name) VALUES (?)', (team,))
         conn.commit()
-        tid = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()[0]
+        tid = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()['id']
     except:
         conn.close()
         return "团队名已存在，请换一个", 400
@@ -432,16 +429,16 @@ def join():
     team = request.form.get('team', '').strip()
     if not team:
         return "请输入团队名称", 400
-    conn = sqlite3.connect('travel.db')
-    tid = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()
+    conn = get_db()
+    row = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()
     conn.close()
-    if not tid:
+    if not row:
         return "团队不存在，请先创建", 404
-    return redirect(url_for('team_page', team_id=tid[0]))
+    return redirect(url_for('team_page', team_id=row['id']))
 
 @app.route('/team/<int:team_id>')
 def team_page(team_id):
-    conn = sqlite3.connect('travel.db')
+    conn = get_db()
     team = conn.execute('SELECT * FROM teams WHERE id=?', (team_id,)).fetchone()
     if not team:
         conn.close()
@@ -456,7 +453,7 @@ def add_member(team_id):
     name = request.form.get('name', '').strip()
     if not name:
         return "名字不能为空", 400
-    conn = sqlite3.connect('travel.db')
+    conn = get_db()
     try:
         conn.execute('INSERT INTO members (team_id, name) VALUES (?,?)', (team_id, name))
         conn.commit()
@@ -473,7 +470,7 @@ def create_trip(team_id):
     end_date = request.form.get('end_date', '')
     if not trip_name or not start_date or not end_date:
         return "请填写完整信息", 400
-    conn = sqlite3.connect('travel.db')
+    conn = get_db()
     conn.execute('INSERT INTO trips (team_id, trip_name, start_date, end_date) VALUES (?,?,?,?)',
                  (team_id, trip_name, start_date, end_date))
     conn.commit()
@@ -482,7 +479,7 @@ def create_trip(team_id):
 
 @app.route('/trip/<int:trip_id>')
 def trip_page(trip_id):
-    conn = sqlite3.connect('travel.db')
+    conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     if not trip:
         conn.close()
@@ -539,7 +536,7 @@ def add_expense(trip_id):
     if not payer or amount <= 0 or not sharers:
         return "请填写完整信息", 400
     
-    conn = sqlite3.connect('travel.db')
+    conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     team_id = trip['team_id']
     today = date.today().isoformat()
@@ -559,7 +556,7 @@ def add_expense(trip_id):
 @app.route('/trip/<int:trip_id>/daily_settle', methods=['POST'])
 def daily_settle(trip_id):
     today = date.today().isoformat()
-    conn = sqlite3.connect('travel.db')
+    conn = get_db()
     
     expenses = conn.execute('''
         SELECT * FROM expenses 
@@ -570,7 +567,6 @@ def daily_settle(trip_id):
         conn.close()
         return redirect(url_for('trip_page', trip_id=trip_id))
     
-    # 计算
     paid = defaultdict(float)
     owed = defaultdict(float)
     for e in expenses:
@@ -599,7 +595,6 @@ def daily_settle(trip_id):
     
     total = sum(e['amount'] for e in expenses)
     
-    # 保存清账记录
     conn.execute('INSERT INTO daily_settlements (trip_id, settlement_date, total_amount, result_json) VALUES (?,?,?,?)',
                  (trip_id, today, total, json.dumps(result, ensure_ascii=False)))
     settle_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
@@ -609,7 +604,6 @@ def daily_settle(trip_id):
     
     conn.commit()
     
-    # 重新取数据渲染
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     team_id = trip['team_id']
     members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
@@ -651,7 +645,7 @@ def add_footprint(trip_id):
             file.save(os.path.join(UPLOAD_FOLDER, filename))
             photo_path = filename
     
-    conn = sqlite3.connect('travel.db')
+    conn = get_db()
     conn.execute('INSERT INTO footprints (trip_id, member_name, city_name, latitude, longitude, photo_path, description) VALUES (?,?,?,?,?,?,?)',
                  (trip_id, member_name, city_name, latitude, longitude, photo_path, desc))
     conn.commit()
@@ -675,7 +669,7 @@ def add_log(trip_id):
             file.save(os.path.join(UPLOAD_FOLDER, filename))
             photo_path = filename
     
-    conn = sqlite3.connect('travel.db')
+    conn = get_db()
     conn.execute('INSERT INTO travel_logs (trip_id, member_name, title, content, photo_path, log_date) VALUES (?,?,?,?,?,?)',
                  (trip_id, member_name, title, content, photo_path, date.today().isoformat()))
     conn.commit()
@@ -684,7 +678,7 @@ def add_log(trip_id):
 
 @app.route('/trip/<int:trip_id>/end', methods=['POST'])
 def end_trip(trip_id):
-    conn = sqlite3.connect('travel.db')
+    conn = get_db()
     conn.execute("UPDATE trips SET status='archived' WHERE id=?", (trip_id,))
     conn.commit()
     conn.close()
@@ -694,10 +688,8 @@ def end_trip(trip_id):
 def static_files(filename):
     return send_from_directory('static', filename)
 
-# ---------- 启动 ----------
 if __name__ == '__main__':
     init_db()
-    # 创建 PWA 文件
     os.makedirs('static', exist_ok=True)
     if not os.path.exists('static/manifest.json'):
         with open('static/manifest.json', 'w') as f:
