@@ -97,308 +97,577 @@ def init_db():
     conn.commit()
     conn.close()
 
+# ---------- HTML 样式 ----------
+STYLE = '''
+<style>
+    :root {
+        --primary: #0390B3;
+        --primary-light: #e6f4f8;
+        --black: #1a1a1a;
+        --white: #ffffff;
+        --gray: #f5f5f5;
+        --gray-border: #e0e0e0;
+        --text: #333333;
+        --text-light: #888888;
+        --danger: #e74c3c;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+        max-width: 480px; 
+        margin: 0 auto; 
+        background: var(--gray); 
+        color: var(--text);
+        min-height: 100vh;
+    }
+    .header {
+        background: var(--white);
+        padding: 20px 16px;
+        border-bottom: 1px solid var(--gray-border);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+    .header h2 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--black);
+    }
+    .header a {
+        color: var(--primary);
+        text-decoration: none;
+        font-size: 14px;
+    }
+    .content { padding: 16px; }
+    .card {
+        background: var(--white);
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .card-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--black);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .card-title::before {
+        content: '';
+        width: 4px;
+        height: 18px;
+        background: var(--primary);
+        border-radius: 2px;
+    }
+    input, select, textarea {
+        width: 100%;
+        padding: 12px 16px;
+        margin: 6px 0;
+        border: 2px solid var(--gray-border);
+        border-radius: 12px;
+        font-size: 15px;
+        background: var(--white);
+        transition: border 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+    label {
+        display: block;
+        margin-top: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-light);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .btn {
+        width: 100%;
+        padding: 14px;
+        margin: 8px 0;
+        border: none;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: var(--primary);
+        color: var(--white);
+    }
+    .btn-primary:hover {
+        opacity: 0.9;
+    }
+    .btn-outline {
+        background: var(--white);
+        color: var(--primary);
+        border: 2px solid var(--primary);
+    }
+    .btn-danger {
+        background: var(--danger);
+        color: var(--white);
+    }
+    .btn-sm {
+        width: auto;
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+    .tag {
+        display: inline-block;
+        background: var(--primary-light);
+        color: var(--primary);
+        padding: 6px 14px;
+        border-radius: 20px;
+        margin: 4px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+    .expense-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--gray);
+    }
+    .expense-item:last-child { border-bottom: none; }
+    .expense-payer {
+        font-size: 13px;
+        color: var(--primary);
+        font-weight: 600;
+    }
+    .expense-amount {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--black);
+    }
+    .expense-note {
+        font-size: 14px;
+        color: var(--text);
+    }
+    .settle-box {
+        background: var(--primary-light);
+        padding: 16px;
+        border-radius: 12px;
+        margin-top: 12px;
+    }
+    .settle-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        font-size: 15px;
+    }
+    .settle-amount {
+        font-weight: 700;
+        color: var(--primary);
+    }
+    .trip-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px;
+        margin: 8px 0;
+        background: var(--gray);
+        border-radius: 12px;
+    }
+    .trip-name {
+        font-weight: 600;
+        font-size: 15px;
+    }
+    .trip-date {
+        font-size: 12px;
+        color: var(--text-light);
+    }
+    .badge {
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    .badge-active {
+        background: var(--primary-light);
+        color: var(--primary);
+    }
+    .badge-done {
+        background: #eee;
+        color: #999;
+    }
+    .checkbox-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 8px 0;
+    }
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 14px;
+    }
+    .checkbox-item input[type="checkbox"] {
+        width: auto;
+        margin: 0;
+    }
+    #map {
+        height: 280px;
+        border-radius: 12px;
+        margin: 12px 0;
+    }
+    .photo-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+    }
+    .photo-thumb {
+        width: 72px;
+        height: 72px;
+        object-fit: cover;
+        border-radius: 10px;
+        cursor: pointer;
+    }
+    .log-card {
+        background: var(--gray);
+        padding: 14px;
+        border-radius: 12px;
+        margin: 10px 0;
+    }
+    .log-title {
+        font-weight: 600;
+        font-size: 15px;
+    }
+    .log-meta {
+        font-size: 12px;
+        color: var(--text-light);
+        margin: 4px 0;
+    }
+    .log-content {
+        font-size: 14px;
+        margin-top: 6px;
+    }
+    .log-photo {
+        max-width: 100%;
+        border-radius: 10px;
+        margin-top: 8px;
+        cursor: pointer;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 20px;
+        color: var(--text-light);
+        font-size: 14px;
+    }
+    .amount-input {
+        font-size: 24px;
+        font-weight: 700;
+        text-align: center;
+    }
+    summary {
+        cursor: pointer;
+        font-weight: 600;
+        padding: 8px 0;
+        color: var(--black);
+    }
+    details {
+        margin: 6px 0;
+        padding: 10px;
+        background: var(--gray);
+        border-radius: 10px;
+    }
+</style>
+'''
+
 # ---------- HTML 模板 ----------
-HOME_HTML = '''<!DOCTYPE html>
+HOME_HTML = f'''<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#4CAF50">
+    <meta name="theme-color" content="#0390B3">
     <title>旅行记账</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-        .card { background: white; padding: 20px; margin: 15px 0; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        h2 { color: #333; } h3 { color: #555; font-size: 16px; margin-bottom: 10px; }
-        input, button { width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-        button { background: #4CAF50; color: white; border: none; font-weight: bold; cursor: pointer; }
-    </style>
+    {STYLE}
 </head>
 <body>
-    <h2>🧳 旅行联机记账</h2>
-    <div class="card">
-        <h3>✨ 创建新团队</h3>
-        <form action="/create" method="post">
-            <input name="team" placeholder="团队名称" required>
-            <button type="submit">创建团队</button>
-        </form>
+    <div class="header">
+        <h2>🧳 旅行记账</h2>
     </div>
-    <div class="card">
-        <h3>🔗 加入已有团队</h3>
-        <form action="/join" method="post">
-            <input name="team" placeholder="输入团队名称" required>
-            <button type="submit">加入团队</button>
-        </form>
-    </div>
-</body>
-</html>'''
-
-TEAM_HTML = '''<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#4CAF50">
-    <title>{{ team_name }} - 旅行记账</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 15px; background: #f5f5f5; }
-        .card { background: white; padding: 15px; margin: 12px 0; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        h2 { color: #333; } h3 { color: #555; font-size: 16px; margin-bottom: 10px; }
-        input, select, button { width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-        button { background: #4CAF50; color: white; border: none; font-weight: bold; cursor: pointer; }
-        button.blue { background: #2196F3; }
-        label { display: block; margin-top: 6px; font-weight: bold; color: #555; font-size: 14px; }
-        .tag { display: inline-block; background: #e3f2fd; padding: 4px 12px; border-radius: 20px; margin: 3px; font-size: 14px; }
-        .nav { margin-bottom: 15px; }
-        a { color: #2196F3; text-decoration: none; }
-        .trip-item { padding: 12px; margin: 8px 0; background: #f9f9f9; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-    </style>
-</head>
-<body>
-    <div class="nav">
-        <a href="/">← 首页</a>
-        <h2 style="display:inline; margin-left:10px;">👥 {{ team_name }}</h2>
-    </div>
-
-    <div class="card">
-        <h3>👤 成员管理</h3>
-        <form action="/team/{{ team_id }}/add_member" method="post">
-            <input name="name" placeholder="新成员姓名" required>
-            <button type="submit">添加成员</button>
-        </form>
-        <p style="margin-top:10px;">
-            {% for m in members %}
-            <span class="tag">{{ m.name }}</span>
-            {% endfor %}
-        </p>
-    </div>
-
-    <div class="card">
-        <h3>🌴 旅途列表</h3>
-        {% for t in trips %}
-        <div class="trip-item">
-            <div>
-                <strong>{{ t.trip_name }}</strong><br>
-                <small style="color:#999;">{{ t.start_date }} ~ {{ t.end_date }}</small>
-            </div>
-            {% if t.status == 'active' %}
-            <a href="/trip/{{ t.id }}"><button class="blue" style="width:auto; padding:8px 16px;">进入 →</button></a>
-            {% else %}
-            <span style="color:#999;">已归档</span>
-            {% endif %}
+    <div class="content">
+        <div class="card">
+            <div class="card-title">创建新团队</div>
+            <form action="/create" method="post">
+                <input name="team" placeholder="输入团队名称" required>
+                <button type="submit" class="btn btn-primary">创建团队</button>
+            </form>
         </div>
-        {% endfor %}
-        
-        <button class="blue" onclick="document.getElementById('tripForm').style.display='block'" style="margin-top:10px;">+ 新建旅途</button>
-        <div id="tripForm" style="display:none; margin-top:10px; padding:15px; background:#f9f9f9; border-radius:8px;">
-            <form action="/team/{{ team_id }}/create_trip" method="post">
-                <input name="trip_name" placeholder="旅途名称" required>
-                <label>开始日期</label>
-                <input name="start_date" type="date" required>
-                <label>结束日期</label>
-                <input name="end_date" type="date" required>
-                <button type="submit">创建旅途</button>
+        <div class="card">
+            <div class="card-title">加入已有团队</div>
+            <form action="/join" method="post">
+                <input name="team" placeholder="输入团队名称" required>
+                <button type="submit" class="btn btn-outline">加入团队</button>
             </form>
         </div>
     </div>
 </body>
 </html>'''
 
-TRIP_HTML = '''<!DOCTYPE html>
+TEAM_HTML = f'''<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#4CAF50">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <title>{{ trip_name }} - 旅行记账</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 15px; background: #f5f5f5; }
-        .card { background: white; padding: 15px; margin: 12px 0; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        h3 { color: #555; font-size: 16px; margin-bottom: 10px; }
-        input, select, textarea, button { width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-        button { background: #4CAF50; color: white; border: none; font-weight: bold; cursor: pointer; }
-        button.red { background: #f44336; }
-        button.blue { background: #2196F3; }
-        label { display: block; margin-top: 6px; font-weight: bold; color: #555; font-size: 14px; }
-        .nav { margin-bottom: 15px; }
-        a { color: #2196F3; text-decoration: none; }
-        .settle-box { background: #e8f5e9; padding: 15px; border-radius: 8px; margin: 10px 0; }
-        .expense-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
-        #map { height: 300px; border-radius: 12px; margin: 10px 0; }
-        .photo-thumb { width: 70px; height: 70px; object-fit: cover; border-radius: 8px; cursor: pointer; margin: 3px; }
-        .log-item { background: #f9f9f9; padding: 12px; border-radius: 8px; margin: 8px 0; }
-    </style>
+    <meta name="theme-color" content="#0390B3">
+    <title>{{{{ team_name }}}} - 旅行记账</title>
+    {STYLE}
 </head>
 <body>
-    <div class="nav">
-        <a href="/team/{{ team_id }}">← 团队</a>
-        <h2 style="display:inline; margin-left:10px;">🌴 {{ trip_name }}</h2>
+    <div class="header">
+        <a href="/">← 首页</a>
+        <h2>👥 {{{{ team_name }}}}</h2>
     </div>
-
-    <div class="card">
-        <h3>💰 记录垫付</h3>
-        <form action="/trip/{{ trip_id }}/add_expense" method="post">
-            <label>谁垫付的？</label>
-            <select name="payer" required>
-                {% for m in members %}
-                <option value="{{ m.name }}">{{ m.name }}</option>
-                {% endfor %}
-            </select>
-            <label>金额（元）</label>
-            <input name="amount" type="number" step="0.01" placeholder="0.00" required>
-            <label>备注</label>
-            <input name="note" placeholder="如：晚餐、打车">
-            <label>分摊给谁？</label>
-            <div style="display:flex; flex-wrap:wrap; gap:8px;">
-            {% for m in members %}
-            <label style="font-weight:normal; width:auto;">
-                <input type="checkbox" name="sharers" value="{{ m.name }}" checked> {{ m.name }}
-            </label>
-            {% endfor %}
+    <div class="content">
+        <div class="card">
+            <div class="card-title">成员管理</div>
+            <form action="/team/{{{{ team_id }}}}/add_member" method="post">
+                <input name="name" placeholder="添加新成员" required>
+                <button type="submit" class="btn btn-primary">添加</button>
+            </form>
+            <div style="margin-top:12px;">
+                {{{{ '% for m in members %' }}}}
+                <span class="tag">{{{{ m.name }}}}</span>
+                {{{{ '% endfor %' }}}}
             </div>
-            <button type="submit">✅ 记录支出</button>
-        </form>
-    </div>
-
-    <div class="card">
-        <h3>📋 今日账单 - {{ today }}</h3>
-        {% for e in today_expenses %}
-        <div class="expense-item">
-            <span>{{ e.note or '无备注' }}</span>
-            <span>{{ e.payer_name }} 付 <strong>¥{{ "%.2f" % e.amount }}</strong></span>
         </div>
-        {% endfor %}
-        {% if not today_expenses %}
-        <p style="color:#999;">今天还没有支出记录</p>
-        {% endif %}
-        
-        {% if today_expenses %}
-        <form action="/trip/{{ trip_id }}/daily_settle" method="post" style="margin-top:10px;">
-            <button type="submit">🧮 今日清账</button>
-        </form>
-        {% endif %}
-        
-        {% if settle_result %}
-        <div class="settle-box">
-            <p><strong>💸 转账建议：</strong></p>
-            {% for r in settle_result %}
-            <p>{{ r.from }} ➡️ {{ r.to }}：<strong>¥{{ "%.2f" % r.amount }}</strong></p>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
 
-    <div class="card">
-        <h3>📅 清账历史</h3>
-        {% for s in settlements %}
-        <details style="margin:8px 0; padding:10px; background:#f9f9f9; border-radius:8px;">
-            <summary><strong>{{ s.settlement_date }}</strong> - 总计 ¥{{ "%.2f" % s.total_amount }}</summary>
-            <div style="padding:10px 0;">
-            {% for r in s.parsed_result %}
-            <p>{{ r.from }} ➡️ {{ r.to }}：¥{{ "%.2f" % r.amount }}</p>
-            {% endfor %}
+        <div class="card">
+            <div class="card-title">旅途列表</div>
+            {{{{ '% for t in trips %' }}}}
+            <div class="trip-item">
+                <div>
+                    <div class="trip-name">{{{{ t.trip_name }}}}</div>
+                    <div class="trip-date">{{{{ t.start_date }}}} ~ {{{{ t.end_date }}}}</div>
+                </div>
+                {{{{ '% if t.status == "active" %' }}}}
+                <a href="/trip/{{{{ t.id }}}}"><button class="btn btn-primary btn-sm">进入</button></a>
+                {{{{ '% else %' }}}}
+                <span class="badge badge-done">已归档</span>
+                {{{{ '% endif %' }}}}
             </div>
-        </details>
-        {% endfor %}
-        {% if not settlements %}
-        <p style="color:#999;">暂无清账记录</p>
-        {% endif %}
-    </div>
-
-    <div class="card">
-        <h3>🗺️ 足迹地图</h3>
-        <div id="map"></div>
-        <h4 style="margin-top:10px;">添加足迹</h4>
-        <form action="/trip/{{ trip_id }}/add_footprint" method="post" enctype="multipart/form-data">
-            <label>记录人</label>
-            <select name="member_name" required>
-                {% for m in members %}
-                <option value="{{ m.name }}">{{ m.name }}</option>
-                {% endfor %}
-            </select>
-            <input name="city_name" placeholder="城市名，如：三亚" required>
-            <button type="button" class="blue" onclick="getLocation()">📍 自动获取位置</button>
-            <input type="hidden" name="latitude" id="lat_input">
-            <input type="hidden" name="longitude" id="lng_input">
-            <input name="description" placeholder="描述（可选）">
-            <label>照片（可选）</label>
-            <input type="file" name="photo" accept="image/*">
-            <button type="submit">📌 记录足迹</button>
-        </form>
-        <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:5px;">
-            {% for fp in footprints %}
-            <div style="text-align:center;">
-                {% if fp.photo_path %}
-                <img src="/static/photos/{{ fp.photo_path }}" class="photo-thumb" onclick="window.open(this.src)">
-                {% else %}
-                <div style="width:70px;height:70px;background:#eee;border-radius:8px;line-height:70px;font-size:12px;">无图</div>
-                {% endif %}
-                <br><small>{{ fp.city_name }}<br>{{ fp.member_name }}</small>
+            {{{{ '% endfor %' }}}}
+            
+            <button class="btn btn-outline" onclick="document.getElementById('tripForm').style.display='block'" style="margin-top:10px;">+ 新建旅途</button>
+            <div id="tripForm" style="display:none; margin-top:12px; padding:16px; background:var(--gray); border-radius:12px;">
+                <form action="/team/{{{{ team_id }}}}/create_trip" method="post">
+                    <input name="trip_name" placeholder="旅途名称" required>
+                    <label>开始日期</label>
+                    <input name="start_date" type="date" required>
+                    <label>结束日期</label>
+                    <input name="end_date" type="date" required>
+                    <button type="submit" class="btn btn-primary">创建旅途</button>
+                </form>
             </div>
-            {% endfor %}
         </div>
     </div>
+</body>
+</html>'''
 
-    <div class="card">
-        <h3>📝 旅行日志</h3>
-        <form action="/trip/{{ trip_id }}/add_log" method="post" enctype="multipart/form-data">
-            <label>作者</label>
-            <select name="member_name" required>
-                {% for m in members %}
-                <option value="{{ m.name }}">{{ m.name }}</option>
-                {% endfor %}
-            </select>
-            <input name="title" placeholder="日志标题" required>
-            <textarea name="content" rows="3" placeholder="记录旅途中的美好..."></textarea>
-            <label>配图（可选）</label>
-            <input type="file" name="photo" accept="image/*">
-            <button type="submit">✍️ 发布日志</button>
+TRIP_HTML = f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0390B3">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>{{{{ trip_name }}}} - 旅行记账</title>
+    {STYLE}
+</head>
+<body>
+    <div class="header">
+        <a href="/team/{{{{ team_id }}}}">← 团队</a>
+        <h2>🌴 {{{{ trip_name }}}}</h2>
+    </div>
+    <div class="content">
+        <!-- 记账 -->
+        <div class="card">
+            <div class="card-title">记录垫付</div>
+            <form action="/trip/{{{{ trip_id }}}}/add_expense" method="post">
+                <label>谁付的钱</label>
+                <select name="payer" required>
+                    {{{{ '% for m in members %' }}}}
+                    <option value="{{{{ m.name }}}}">{{{{ m.name }}}}</option>
+                    {{{{ '% endfor %' }}}}
+                </select>
+                <label>金额</label>
+                <input name="amount" type="number" step="0.01" placeholder="0.00" class="amount-input" required>
+                <label>备注</label>
+                <input name="note" placeholder="如：晚餐、打车">
+                <label>分摊给谁</label>
+                <div class="checkbox-group">
+                    {{{{ '% for m in members %' }}}}
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="sharers" value="{{{{ m.name }}}}" checked> {{{{ m.name }}}}
+                    </label>
+                    {{{{ '% endfor %' }}}}
+                </div>
+                <button type="submit" class="btn btn-primary">✅ 记录支出</button>
+            </form>
+        </div>
+
+        <!-- 今日账单 -->
+        <div class="card">
+            <div class="card-title">📋 今日账单 · {{{{ today }}}}</div>
+            {{{{ '% for e in today_expenses %' }}}}
+            <div class="expense-item">
+                <div>
+                    <div class="expense-note">{{{{ e.note or '无备注' }}}}</div>
+                    <div class="expense-payer">{{{{ e.payer_name }}}} 垫付</div>
+                </div>
+                <div class="expense-amount">¥{{{{ "%.2f" % e.amount }}}}</div>
+            </div>
+            {{{{ '% endfor %' }}}}
+            {{{{ '% if not today_expenses %' }}}}
+            <div class="empty-state">今天还没有支出记录</div>
+            {{{{ '% endif %' }}}}
+            
+            {{{{ '% if today_expenses %' }}}}
+            <form action="/trip/{{{{ trip_id }}}}/daily_settle" method="post" style="margin-top:12px;">
+                <button type="submit" class="btn btn-primary">🧮 今日清账</button>
+            </form>
+            {{{{ '% endif %' }}}}
+            
+            {{{{ '% if settle_result %' }}}}
+            <div class="settle-box">
+                <div style="font-weight:600; margin-bottom:8px;">💸 转账建议（最少次数）</div>
+                {{{{ '% for r in settle_result %' }}}}
+                <div class="settle-item">
+                    <span>{{{{ r.from }}}} → {{{{ r.to }}}}</span>
+                    <span class="settle-amount">¥{{{{ "%.2f" % r.amount }}}}</span>
+                </div>
+                {{{{ '% endfor %' }}}}
+            </div>
+            {{{{ '% endif %' }}}}
+        </div>
+
+        <!-- 清账历史 -->
+        <div class="card">
+            <div class="card-title">📅 清账记录</div>
+            {{{{ '% for s in settlements %' }}}}
+            <details>
+                <summary>{{{{ s.settlement_date }}}} · 总计 ¥{{{{ "%.2f" % s.total_amount }}}}</summary>
+                <div style="padding:8px 0;">
+                {{{{ '% for r in s.parsed_result %' }}}}
+                <div class="settle-item">
+                    <span>{{{{ r.from }}}} → {{{{ r.to }}}}</span>
+                    <span class="settle-amount">¥{{{{ "%.2f" % r.amount }}}}</span>
+                </div>
+                {{{{ '% endfor %' }}}}
+                </div>
+            </details>
+            {{{{ '% endfor %' }}}}
+            {{{{ '% if not settlements %' }}}}
+            <div class="empty-state">暂无清账记录</div>
+            {{{{ '% endif %' }}}}
+        </div>
+
+        <!-- 足迹地图 -->
+        <div class="card">
+            <div class="card-title">🗺️ 足迹地图</div>
+            <div id="map"></div>
+            <form action="/trip/{{{{ trip_id }}}}/add_footprint" method="post" enctype="multipart/form-data" style="margin-top:12px;">
+                <label>记录人</label>
+                <select name="member_name" required>
+                    {{{{ '% for m in members %' }}}}
+                    <option value="{{{{ m.name }}}}">{{{{ m.name }}}}</option>
+                    {{{{ '% endfor %' }}}}
+                </select>
+                <input name="city_name" placeholder="城市名" required>
+                <button type="button" class="btn btn-outline btn-sm" onclick="getLocation()">📍 获取位置</button>
+                <input type="hidden" name="latitude" id="lat_input">
+                <input type="hidden" name="longitude" id="lng_input">
+                <input name="description" placeholder="描述（可选）">
+                <label>照片</label>
+                <input type="file" name="photo" accept="image/*">
+                <button type="submit" class="btn btn-primary">📌 记录足迹</button>
+            </form>
+            <div class="photo-grid">
+                {{{{ '% for fp in footprints %' }}}}
+                <div style="text-align:center;">
+                    {{{{ '% if fp.photo_path %' }}}}
+                    <img src="/static/photos/{{{{ fp.photo_path }}}}" class="photo-thumb" onclick="window.open(this.src)">
+                    {{{{ '% else %' }}}}
+                    <div style="width:72px;height:72px;background:#eee;border-radius:10px;line-height:72px;font-size:11px;color:#999;">无图</div>
+                    {{{{ '% endif %' }}}}
+                    <div style="font-size:11px;margin-top:2px;">{{{{ fp.city_name }}}}</div>
+                </div>
+                {{{{ '% endfor %' }}}}
+            </div>
+        </div>
+
+        <!-- 旅行日志 -->
+        <div class="card">
+            <div class="card-title">📝 旅行日志</div>
+            <form action="/trip/{{{{ trip_id }}}}/add_log" method="post" enctype="multipart/form-data">
+                <label>作者</label>
+                <select name="member_name" required>
+                    {{{{ '% for m in members %' }}}}
+                    <option value="{{{{ m.name }}}}">{{{{ m.name }}}}</option>
+                    {{{{ '% endfor %' }}}}
+                </select>
+                <input name="title" placeholder="日志标题" required>
+                <textarea name="content" rows="3" placeholder="记录旅途中的美好..."></textarea>
+                <label>配图</label>
+                <input type="file" name="photo" accept="image/*">
+                <button type="submit" class="btn btn-primary">✍️ 发布日志</button>
+            </form>
+            
+            {{{{ '% for log in logs %' }}}}
+            <div class="log-card">
+                <div class="log-title">{{{{ log.title }}}}</div>
+                <div class="log-meta">{{{{ log.member_name }}}} · {{{{ log.log_date }}}}</div>
+                <div class="log-content">{{{{ log.content }}}}</div>
+                {{{{ '% if log.photo_path %' }}}}
+                <img src="/static/photos/{{{{ log.photo_path }}}}" class="log-photo" onclick="window.open(this.src)">
+                {{{{ '% endif %' }}}}
+            </div>
+            {{{{ '% endfor %' }}}}
+        </div>
+
+        <form action="/trip/{{{{ trip_id }}}}/end" method="post">
+            <button class="btn btn-danger" type="submit" onclick="return confirm('确定结束这次旅途吗？')">🏁 结束旅途并归档</button>
         </form>
-        
-        {% for log in logs %}
-        <div class="log-item">
-            <strong>{{ log.title }}</strong>
-            <p style="color:#999;font-size:12px;">{{ log.member_name }} · {{ log.log_date }}</p>
-            <p style="margin:5px 0;">{{ log.content }}</p>
-            {% if log.photo_path %}
-            <img src="/static/photos/{{ log.photo_path }}" style="max-width:100%;border-radius:8px;cursor:pointer;" onclick="window.open(this.src)">
-            {% endif %}
-        </div>
-        {% endfor %}
     </div>
-
-    <form action="/trip/{{ trip_id }}/end" method="post" style="margin:15px 0;">
-        <button class="red" type="submit" onclick="return confirm('确定结束这次旅途吗？')">🏁 结束旅途并归档</button>
-    </form>
 
     <script>
         var map = L.map('map').setView([35, 105], 4);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: '&copy; OpenStreetMap'}).addTo(map);
+        L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{attribution: '&copy; OpenStreetMap'}}).addTo(map);
         
-        var fpData = {{ footprints_json | safe }};
-        fpData.forEach(function(f) {
-            if (f.latitude && f.longitude) {
+        var fpData = {{{{ footprints_json | safe }}}};
+        fpData.forEach(function(f) {{
+            if (f.latitude && f.longitude) {{
                 var m = L.marker([f.latitude, f.longitude]).addTo(map);
                 var html = '<b>' + f.city_name + '</b><br>' + (f.description||'') + '<br>by ' + f.member_name;
-                if (f.photo_path) html += '<br><img src="/static/photos/' + f.photo_path + '" style="max-width:150px;border-radius:5px;">';
+                if (f.photo_path) html += '<br><img src="/static/photos/' + f.photo_path + '" style="max-width:150px;border-radius:8px;">';
                 m.bindPopup(html);
-            }
-        });
+            }}
+        }});
         
-        function getLocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function(p) {
+        function getLocation() {{
+            if (navigator.geolocation) {{
+                navigator.geolocation.getCurrentPosition(function(p) {{
                     document.getElementById('lat_input').value = p.coords.latitude;
                     document.getElementById('lng_input').value = p.coords.longitude;
                     map.setView([p.coords.latitude, p.coords.longitude], 12);
                     L.marker([p.coords.latitude, p.coords.longitude]).addTo(map).bindPopup('当前位置').openPopup();
-                });
-            } else { alert('请允许定位或手动输入经纬度'); }
-        }
+                }});
+            }} else {{ alert('请允许定位'); }}
+        }}
     </script>
 </body>
 </html>'''
@@ -420,7 +689,7 @@ def create():
         tid = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()['id']
     except:
         conn.close()
-        return "团队名已存在，请换一个", 400
+        return "团队名已存在", 400
     conn.close()
     return redirect(url_for('team_page', team_id=tid))
 
@@ -433,7 +702,7 @@ def join():
     row = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()
     conn.close()
     if not row:
-        return "团队不存在，请先创建", 404
+        return "团队不存在", 404
     return redirect(url_for('team_page', team_id=row['id']))
 
 @app.route('/team/<int:team_id>')
@@ -581,20 +850,22 @@ def daily_settle(trip_id):
     
     creditors = [(n, net[n]) for n in net if net[n] > 0.01]
     debtors = [(n, -net[n]) for n in net if net[n] < -0.01]
+    creditors.sort(key=lambda x: -x[1])
+    debtors.sort(key=lambda x: -x[1])
     result = []
     i, j = 0, 0
     while i < len(creditors) and j < len(debtors):
         c_name, c_amt = creditors[i]
         d_name, d_amt = debtors[j]
-        t = min(c_amt, d_amt)
+        t = round(min(c_amt, d_amt), 2)
         if t > 0.01:
-            result.append({'from': d_name, 'to': c_name, 'amount': round(t,2)})
-        creditors[i] = (c_name, c_amt - t)
-        debtors[j] = (d_name, d_amt - t)
+            result.append({'from': d_name, 'to': c_name, 'amount': t})
+        creditors[i] = (c_name, round(c_amt - t, 2))
+        debtors[j] = (d_name, round(d_amt - t, 2))
         if creditors[i][1] < 0.01: i += 1
         if debtors[j][1] < 0.01: j += 1
     
-    total = sum(e['amount'] for e in expenses)
+    total = round(sum(e['amount'] for e in expenses), 2)
     
     conn.execute('INSERT INTO daily_settlements (trip_id, settlement_date, total_amount, result_json) VALUES (?,?,?,?)',
                  (trip_id, today, total, json.dumps(result, ensure_ascii=False)))
@@ -694,5 +965,5 @@ if __name__ == '__main__':
     os.makedirs('static', exist_ok=True)
     if not os.path.exists('static/manifest.json'):
         with open('static/manifest.json', 'w') as f:
-            f.write('{"name":"旅行记账","short_name":"记账","start_url":"/","display":"standalone","theme_color":"#4CAF50"}')
+            f.write('{"name":"旅行记账","short_name":"记账","start_url":"/","display":"standalone","theme_color":"#0390B3"}')
     app.run(host='0.0.0.0', port=5000)
