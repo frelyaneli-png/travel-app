@@ -474,8 +474,9 @@ def create_trip(team_id):
     conn.execute('INSERT INTO trips (team_id, trip_name, start_date, end_date) VALUES (?,?,?,?)',
                  (team_id, trip_name, start_date, end_date))
     conn.commit()
+    trip_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
     conn.close()
-    return redirect(url_for('team_page', team_id=team_id))
+    return redirect(url_for('trip_page', trip_id=trip_id))
 
 @app.route('/trip/<int:trip_id>')
 def trip_page(trip_id):
