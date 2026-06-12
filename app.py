@@ -740,4 +740,5 @@ def add_footprint(trip_id):
             file.save(os.path.join(UPLOAD_FOLDER, filename))
             photo_path = filename
     
-    conn.execute('''INSERT INTO footprints (trip_id,
+    conn.execute('INSERT INTO footprints (trip_id, member_id, member_name, city_name, latitude, longitude, photo_path, description) VALUES (?,?,?,?,?,?,?,?)',
+                 (trip_id, member_id, member['name'], city_name, lat, lng, photo_path, description))
