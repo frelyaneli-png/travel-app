@@ -1,3 +1,231 @@
+from flask import Flask, request, render_template_string, redirect, url_for, send_from_directory
+import sqlite3
+import os
+import json
+import uuid
+from datetime import date
+from collections import defaultdict
+from werkzeug.utils import secure_filename
+
+app = Flask(__name__)
+
+# ---------- 配置 ----------
+UPLOAD_FOLDER = os.path.join('static', 'photos')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_db():
+    conn = sqlite3.connect('travel.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# ---------- 数据库初始化 ----------
+def init_db():
+    conn = get_db()
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS teams (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        );
+        
+        CREATE TABLE IF NOT EXISTS members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            team_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            UNIQUE(team_id, name)
+        );
+        
+        CREATE TABLE IF NOT EXISTS trips (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            team_id INTEGER NOT NULL,
+            trip_name TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            status TEXT DEFAULT 'active'
+        );
+        
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trip_id INTEGER NOT NULL,
+            team_id INTEGER NOT NULL,
+            payer_name TEXT NOT NULL,
+            amount REAL NOT NULL,
+            note TEXT,
+            expense_date TEXT NOT NULL,
+            settlement_id INTEGER DEFAULT NULL
+        );
+        
+        CREATE TABLE IF NOT EXISTS expense_shares (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            expense_id INTEGER NOT NULL,
+            member_name TEXT NOT NULL,
+            share REAL NOT NULL
+        );
+        
+        CREATE TABLE IF NOT EXISTS daily_settlements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trip_id INTEGER NOT NULL,
+            settlement_date TEXT NOT NULL,
+            total_amount REAL NOT NULL,
+            result_json TEXT NOT NULL
+        );
+        
+        CREATE TABLE IF NOT EXISTS footprints (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trip_id INTEGER NOT NULL,
+            member_name TEXT NOT NULL,
+            city_name TEXT NOT NULL,
+            latitude REAL,
+            longitude REAL,
+            photo_path TEXT,
+            description TEXT
+        );
+        
+        CREATE TABLE IF NOT EXISTS travel_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trip_id INTEGER NOT NULL,
+            member_name TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT,
+            photo_path TEXT,
+            log_date TEXT NOT NULL
+        );
+    ''')
+    conn.commit()
+    conn.close()
+
+# ---------- HTML 模板 ----------
+HOME_HTML = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0390B3">
+    <title>旅行记账</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif; max-width: 500px; margin: 0 auto; padding: 24px 16px; background: #f8f9fa; color: #1a1a1a; }
+        .logo { text-align: center; padding: 28px 0 8px; }
+        .logo .icon { font-size: 44px; }
+        .logo h1 { font-size: 22px; font-weight: 700; margin-top: 6px; color: #1a1a1a; }
+        .logo p { font-size: 13px; color: #999; margin-top: 2px; }
+        .card { background: #fff; padding: 20px; margin: 12px 0; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .card h3 { font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 12px; }
+        input, button { width: 100%; padding: 12px 14px; margin: 5px 0; border: 1.5px solid #e8e8e8; border-radius: 10px; font-size: 15px; background: #fafafa; color: #1a1a1a; }
+        input:focus { outline: none; border-color: #0390B3; background: #fff; }
+        button { background: #0390B3; color: #fff; border: none; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #027a99; }
+        button.outline { background: #fff; color: #0390B3; border: 1.5px solid #0390B3; }
+        button.outline:hover { background: #f0f9fb; }
+    </style>
+</head>
+<body>
+    <div class="logo">
+        <div class="icon">🧳</div>
+        <h1>旅行记账</h1>
+        <p>多人联机 · 实时同步</p>
+    </div>
+    <div class="card">
+        <h3>✨ 创建新团队</h3>
+        <form action="/create" method="post">
+            <input name="team" placeholder="输入团队名称" required>
+            <button type="submit">创建团队</button>
+        </form>
+    </div>
+    <div class="card">
+        <h3>🔗 加入已有团队</h3>
+        <form action="/join" method="post">
+            <input name="team" placeholder="输入已有团队名称" required>
+            <button type="submit" class="outline">加入团队</button>
+        </form>
+    </div>
+</body>
+</html>'''
+
+TEAM_HTML = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0390B3">
+    <title>{{ team_name }} - 旅行记账</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif; max-width: 500px; margin: 0 auto; padding: 20px 16px; background: #f8f9fa; color: #1a1a1a; }
+        .header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+        .header a { color: #0390B3; text-decoration: none; font-size: 14px; font-weight: 500; }
+        .header h2 { font-size: 18px; font-weight: 700; }
+        .card { background: #fff; padding: 18px; margin: 10px 0; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .card h3 { font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 10px; }
+        input, select, button { width: 100%; padding: 11px 14px; margin: 5px 0; border: 1.5px solid #e8e8e8; border-radius: 10px; font-size: 15px; background: #fafafa; color: #1a1a1a; }
+        input:focus, select:focus { outline: none; border-color: #0390B3; background: #fff; }
+        button { background: #0390B3; color: #fff; border: none; font-weight: 600; cursor: pointer; }
+        button.sm { width: auto; padding: 8px 16px; font-size: 14px; }
+        button.outline { background: #fff; color: #0390B3; border: 1.5px solid #0390B3; }
+        label { display: block; margin-top: 6px; font-size: 13px; font-weight: 600; color: #666; }
+        .tag { display: inline-block; background: #e8f4f8; color: #0390B3; padding: 5px 14px; border-radius: 20px; margin: 3px; font-size: 13px; font-weight: 500; }
+        .trip-item { padding: 14px; margin: 6px 0; background: #fafafa; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .trip-item strong { font-size: 15px; }
+        .trip-item span { font-size: 12px; color: #999; }
+        .hidden-form { display: none; margin-top: 10px; padding: 16px; background: #fafafa; border-radius: 12px; }
+        a { color: #0390B3; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/">← 首页</a>
+        <h2>👥 {{ team_name }}</h2>
+    </div>
+
+    <div class="card">
+        <h3>👤 成员管理</h3>
+        <form action="/team/{{ team_id }}/add_member" method="post" style="display:flex; gap:8px;">
+            <input name="name" placeholder="新成员姓名" required style="flex:1;">
+            <button type="submit" class="sm" style="margin:5px 0;">添加</button>
+        </form>
+        <p style="margin-top:10px;">
+            {% for m in members %}
+            <span class="tag">{{ m.name }}</span>
+            {% endfor %}
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>🌴 旅途列表</h3>
+        {% for t in trips %}
+        <div class="trip-item">
+            <div>
+                <strong>{{ t.trip_name }}</strong><br>
+                <span>{{ t.start_date }} — {{ t.end_date }}</span>
+            </div>
+            {% if t.status == 'active' %}
+            <a href="/trip/{{ t.id }}"><button class="sm">进入 →</button></a>
+            {% else %}
+            <span style="font-size:12px; color:#bbb;">已归档</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+        
+        <button class="outline sm" onclick="document.getElementById('tripForm').style.display='block'" style="margin-top:8px;">+ 新建旅途</button>
+        <div id="tripForm" class="hidden-form">
+            <form action="/team/{{ team_id }}/create_trip" method="post">
+                <input name="trip_name" placeholder="旅途名称" required>
+                <label>开始日期</label>
+                <input name="start_date" type="date" required>
+                <label>结束日期</label>
+                <input name="end_date" type="date" required>
+                <button type="submit">创建旅途</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>'''
+
 TRIP_HTML = '''<!DOCTYPE html>
 <html>
 <head>
@@ -213,3 +441,297 @@ TRIP_HTML = '''<!DOCTYPE html>
     </script>
 </body>
 </html>'''
+
+# ---------- 路由 ----------
+@app.route('/')
+def index():
+    return render_template_string(HOME_HTML)
+
+@app.route('/create', methods=['POST'])
+def create():
+    team = request.form.get('team', '').strip()
+    if not team:
+        return "团队名不能为空", 400
+    conn = get_db()
+    try:
+        conn.execute('INSERT INTO teams (name) VALUES (?)', (team,))
+        conn.commit()
+        tid = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()['id']
+    except:
+        conn.close()
+        return "团队名已存在，请换一个", 400
+    conn.close()
+    return redirect(url_for('team_page', team_id=tid))
+
+@app.route('/join', methods=['POST'])
+def join():
+    team = request.form.get('team', '').strip()
+    if not team:
+        return "请输入团队名称", 400
+    conn = get_db()
+    row = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()
+    conn.close()
+    if not row:
+        return "团队不存在，请先创建", 404
+    return redirect(url_for('team_page', team_id=row['id']))
+
+@app.route('/team/<int:team_id>')
+def team_page(team_id):
+    conn = get_db()
+    team = conn.execute('SELECT * FROM teams WHERE id=?', (team_id,)).fetchone()
+    if not team:
+        conn.close()
+        return "团队不存在", 404
+    members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
+    trips = conn.execute('SELECT * FROM trips WHERE team_id=? ORDER BY start_date DESC', (team_id,)).fetchall()
+    conn.close()
+    return render_template_string(TEAM_HTML, team_id=team_id, team_name=team['name'], members=members, trips=trips)
+
+@app.route('/team/<int:team_id>/add_member', methods=['POST'])
+def add_member(team_id):
+    name = request.form.get('name', '').strip()
+    if not name:
+        return "名字不能为空", 400
+    conn = get_db()
+    try:
+        conn.execute('INSERT INTO members (team_id, name) VALUES (?,?)', (team_id, name))
+        conn.commit()
+    except:
+        conn.close()
+        return "该成员已存在", 400
+    conn.close()
+    return redirect(url_for('team_page', team_id=team_id))
+
+@app.route('/team/<int:team_id>/create_trip', methods=['POST'])
+def create_trip(team_id):
+    trip_name = request.form.get('trip_name', '').strip()
+    start_date = request.form.get('start_date', '')
+    end_date = request.form.get('end_date', '')
+    if not trip_name or not start_date or not end_date:
+        return "请填写完整信息", 400
+    conn = get_db()
+    conn.execute('INSERT INTO trips (team_id, trip_name, start_date, end_date) VALUES (?,?,?,?)',
+                 (team_id, trip_name, start_date, end_date))
+    conn.commit()
+    trip_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+    conn.close()
+    return redirect(url_for('trip_page', trip_id=trip_id))
+
+@app.route('/trip/<int:trip_id>')
+def trip_page(trip_id):
+    conn = get_db()
+    trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
+    if not trip:
+        conn.close()
+        return "旅途不存在", 404
+    
+    team_id = trip['team_id']
+    members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
+    today = date.today().isoformat()
+    
+    today_expenses = conn.execute('''
+        SELECT * FROM expenses 
+        WHERE trip_id=? AND expense_date=? AND settlement_id IS NULL
+        ORDER BY rowid DESC
+    ''', (trip_id, today)).fetchall()
+    
+    settlements_raw = conn.execute('SELECT * FROM daily_settlements WHERE trip_id=? ORDER BY settlement_date DESC', (trip_id,)).fetchall()
+    settlements = []
+    for s in settlements_raw:
+        settlements.append({
+            'settlement_date': s['settlement_date'],
+            'total_amount': s['total_amount'],
+            'parsed_result': json.loads(s['result_json'])
+        })
+    
+    footprints = conn.execute('SELECT * FROM footprints WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
+    logs = conn.execute('SELECT * FROM travel_logs WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
+    conn.close()
+    
+    fp_json = []
+    for f in footprints:
+        fp_json.append({
+            'city_name': f['city_name'],
+            'latitude': f['latitude'],
+            'longitude': f['longitude'],
+            'photo_path': f['photo_path'],
+            'description': f['description'],
+            'member_name': f['member_name']
+        })
+    
+    return render_template_string(TRIP_HTML,
+        trip_id=trip_id, trip_name=trip['trip_name'], team_id=team_id,
+        members=members, today=today, today_expenses=today_expenses,
+        settlements=settlements, settle_result=None,
+        footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False),
+        logs=logs)
+
+@app.route('/trip/<int:trip_id>/add_expense', methods=['POST'])
+def add_expense(trip_id):
+    payer = request.form.get('payer', '')
+    amount = float(request.form.get('amount', 0))
+    note = request.form.get('note', '')
+    sharers = request.form.getlist('sharers')
+    
+    if not payer or amount <= 0 or not sharers:
+        return "请填写完整信息", 400
+    
+    conn = get_db()
+    trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
+    team_id = trip['team_id']
+    today = date.today().isoformat()
+    
+    conn.execute('INSERT INTO expenses (trip_id, team_id, payer_name, amount, note, expense_date) VALUES (?,?,?,?,?,?)',
+                 (trip_id, team_id, payer, amount, note, today))
+    expense_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+    
+    share = round(amount / len(sharers), 2)
+    for s in sharers:
+        conn.execute('INSERT INTO expense_shares (expense_id, member_name, share) VALUES (?,?,?)',
+                     (expense_id, s, share))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('trip_page', trip_id=trip_id))
+
+@app.route('/trip/<int:trip_id>/daily_settle', methods=['POST'])
+def daily_settle(trip_id):
+    today = date.today().isoformat()
+    conn = get_db()
+    
+    expenses = conn.execute('''
+        SELECT * FROM expenses 
+        WHERE trip_id=? AND expense_date=? AND settlement_id IS NULL
+    ''', (trip_id, today)).fetchall()
+    
+    if not expenses:
+        conn.close()
+        return redirect(url_for('trip_page', trip_id=trip_id))
+    
+    paid = defaultdict(float)
+    owed = defaultdict(float)
+    for e in expenses:
+        paid[e['payer_name']] += e['amount']
+        shares = conn.execute('SELECT * FROM expense_shares WHERE expense_id=?', (e['id'],)).fetchall()
+        for s in shares:
+            owed[s['member_name']] += s['share']
+    
+    all_names = set(list(paid.keys()) + list(owed.keys()))
+    net = {n: round(paid.get(n,0) - owed.get(n,0), 2) for n in all_names}
+    
+    creditors = [(n, net[n]) for n in net if net[n] > 0.01]
+    debtors = [(n, -net[n]) for n in net if net[n] < -0.01]
+    result = []
+    i, j = 0, 0
+    while i < len(creditors) and j < len(debtors):
+        c_name, c_amt = creditors[i]
+        d_name, d_amt = debtors[j]
+        t = min(c_amt, d_amt)
+        if t > 0.01:
+            result.append({'from': d_name, 'to': c_name, 'amount': round(t,2)})
+        creditors[i] = (c_name, c_amt - t)
+        debtors[j] = (d_name, d_amt - t)
+        if creditors[i][1] < 0.01: i += 1
+        if debtors[j][1] < 0.01: j += 1
+    
+    total = sum(e['amount'] for e in expenses)
+    
+    conn.execute('INSERT INTO daily_settlements (trip_id, settlement_date, total_amount, result_json) VALUES (?,?,?,?)',
+                 (trip_id, today, total, json.dumps(result, ensure_ascii=False)))
+    settle_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+    
+    for e in expenses:
+        conn.execute('UPDATE expenses SET settlement_id=? WHERE id=?', (settle_id, e['id']))
+    
+    conn.commit()
+    
+    trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
+    team_id = trip['team_id']
+    members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
+    today_expenses = []
+    settlements_raw = conn.execute('SELECT * FROM daily_settlements WHERE trip_id=? ORDER BY settlement_date DESC', (trip_id,)).fetchall()
+    settlements = [{'settlement_date': s['settlement_date'], 'total_amount': s['total_amount'], 'parsed_result': json.loads(s['result_json'])} for s in settlements_raw]
+    footprints = conn.execute('SELECT * FROM footprints WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
+    logs = conn.execute('SELECT * FROM travel_logs WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
+    conn.close()
+    
+    fp_json = [{'city_name':f['city_name'],'latitude':f['latitude'],'longitude':f['longitude'],'photo_path':f['photo_path'],'description':f['description'],'member_name':f['member_name']} for f in footprints]
+    
+    return render_template_string(TRIP_HTML,
+        trip_id=trip_id, trip_name=trip['trip_name'], team_id=team_id,
+        members=members, today=today, today_expenses=today_expenses,
+        settlements=settlements, settle_result=result,
+        footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False),
+        logs=logs)
+
+@app.route('/trip/<int:trip_id>/add_footprint', methods=['POST'])
+def add_footprint(trip_id):
+    member_name = request.form.get('member_name', '')
+    city_name = request.form.get('city_name', '').strip()
+    lat = request.form.get('latitude', '')
+    lng = request.form.get('longitude', '')
+    desc = request.form.get('description', '')
+    
+    if not city_name:
+        return "请输入城市名", 400
+    
+    latitude = float(lat) if lat else None
+    longitude = float(lng) if lng else None
+    
+    photo_path = None
+    if 'photo' in request.files:
+        file = request.files['photo']
+        if file and file.filename and allowed_file(file.filename):
+            filename = uuid.uuid4().hex + '_' + secure_filename(file.filename)
+            file.save(os.path.join(UPLOAD_FOLDER, filename))
+            photo_path = filename
+    
+    conn = get_db()
+    conn.execute('INSERT INTO footprints (trip_id, member_name, city_name, latitude, longitude, photo_path, description) VALUES (?,?,?,?,?,?,?)',
+                 (trip_id, member_name, city_name, latitude, longitude, photo_path, desc))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('trip_page', trip_id=trip_id))
+
+@app.route('/trip/<int:trip_id>/add_log', methods=['POST'])
+def add_log(trip_id):
+    member_name = request.form.get('member_name', '')
+    title = request.form.get('title', '').strip()
+    content = request.form.get('content', '')
+    
+    if not title:
+        return "请输入标题", 400
+    
+    photo_path = None
+    if 'photo' in request.files:
+        file = request.files['photo']
+        if file and file.filename and allowed_file(file.filename):
+            filename = uuid.uuid4().hex + '_' + secure_filename(file.filename)
+            file.save(os.path.join(UPLOAD_FOLDER, filename))
+            photo_path = filename
+    
+    conn = get_db()
+    conn.execute('INSERT INTO travel_logs (trip_id, member_name, title, content, photo_path, log_date) VALUES (?,?,?,?,?,?)',
+                 (trip_id, member_name, title, content, photo_path, date.today().isoformat()))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('trip_page', trip_id=trip_id))
+
+@app.route('/trip/<int:trip_id>/end', methods=['POST'])
+def end_trip(trip_id):
+    conn = get_db()
+    conn.execute("UPDATE trips SET status='archived' WHERE id=?", (trip_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('team_page', team_id=request.args.get('team_id', 1)))
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory('static', filename)
+
+if __name__ == '__main__':
+    init_db()
+    os.makedirs('static', exist_ok=True)
+    if not os.path.exists('static/manifest.json'):
+        with open('static/manifest.json', 'w') as f:
+            f.write('{"name":"旅行记账","short_name":"记账","start_url":"/","display":"standalone","theme_color":"#0390B3"}')
+    app.run(host='0.0.0.0', port=5000)
