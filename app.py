@@ -129,7 +129,7 @@ def create_pwa_files():
     if not os.path.exists(sw_path):
         with open(sw_path, 'w', encoding='utf-8') as f:
             f.write('''
-const CACHE_NAME = 'travel-v1';
+const CACHE_NAME = 'travel-v2';
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['/'])));
 });
@@ -139,38 +139,23 @@ self.addEventListener('fetch', e => {
 ''')
 
 # ---------- HTML 模板 ----------
-BASE_HEAD = '''
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#4CAF50">
-<style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 15px; background: #f5f5f5; }
-    .card { background: white; padding: 20px; margin: 15px 0; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    h2 { color: #333; margin-bottom: 10px; }
-    h3 { color: #555; margin-bottom: 10px; font-size: 16px; }
-    input, select, textarea, button { width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-    button { background: #4CAF50; color: white; border: none; font-weight: bold; cursor: pointer; }
-    button.danger { background: #f44336; }
-    button.secondary { background: #2196F3; }
-    .btn-small { width: auto; padding: 8px 16px; font-size: 14px; }
-    label { display: block; margin-top: 8px; font-weight: bold; color: #555; font-size: 14px; }
-    .tag { display: inline-block; background: #e3f2fd; padding: 4px 12px; border-radius: 20px; margin: 3px; font-size: 14px; }
-    .settle-box { background: #e8f5e9; padding: 15px; border-radius: 8px; margin: 10px 0; }
-    .expense-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
-    .trip-tabs { display: flex; gap: 10px; margin: 10px 0; }
-    .trip-tab { flex: 1; text-align: center; padding: 12px; background: white; border-radius: 8px; cursor: pointer; border: 2px solid #ddd; }
-    .trip-tab.active { border-color: #4CAF50; background: #e8f5e9; }
-    a { color: #2196F3; text-decoration: none; }
-    .nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-    #map { height: 300px; border-radius: 12px; margin: 10px 0; }
-    .photo-preview { max-width: 100%; max-height: 200px; border-radius: 8px; margin: 10px 0; }
-</style>
-'''
-
-HOME_HTML = f'''<!DOCTYPE html>
-<html><head>{BASE_HEAD}<title>旅行记账</title></head>
+HOME_HTML = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#4CAF50">
+    <title>旅行记账</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .card { background: white; padding: 20px; margin: 15px 0; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h2 { color: #333; margin-bottom: 15px; }
+        input, button { width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+        button { background: #4CAF50; color: white; border: none; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
 <body>
     <h2>🧳 旅行联机记账</h2>
     <div class="card">
@@ -187,51 +172,70 @@ HOME_HTML = f'''<!DOCTYPE html>
             <button type="submit">加入团队</button>
         </form>
     </div>
-    <script>
-        if ('serviceWorker' in navigator) {{
-            navigator.serviceWorker.register('/static/sw.js');
-        }}
-    </script>
-</body></html>'''
+</body>
+</html>'''
 
-TEAM_HTML = f'''<!DOCTYPE html>
-<html><head>{BASE_HEAD}<title>{{{{ team_name }}}} - 旅行记账</title></head>
+TEAM_HTML = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#4CAF50">
+    <title>{{ team_name }} - 旅行记账</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 15px; background: #f5f5f5; }
+        .card { background: white; padding: 15px; margin: 12px 0; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h2 { color: #333; }
+        h3 { color: #555; font-size: 16px; margin-bottom: 10px; }
+        input, select, button { width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+        button { background: #4CAF50; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button.blue { background: #2196F3; }
+        button.red { background: #f44336; }
+        button.small { width: auto; padding: 8px 16px; font-size: 14px; }
+        label { display: block; margin-top: 8px; font-weight: bold; color: #555; font-size: 14px; }
+        .tag { display: inline-block; background: #e3f2fd; padding: 4px 12px; border-radius: 20px; margin: 3px; font-size: 14px; }
+        .nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        a { color: #2196F3; text-decoration: none; }
+    </style>
+</head>
 <body>
     <div class="nav">
         <a href="/">← 首页</a>
-        <h2>👥 {{{{ team_name }}}}</h2>
+        <h2>👥 {{ team_name }}</h2>
     </div>
 
     <div class="card">
         <h3>👤 成员管理</h3>
-        <form action="/team/{{{{ team_id }}}}/add_member" method="post">
+        <form action="/team/{{ team_id }}/add_member" method="post">
             <input name="name" placeholder="新成员姓名" required>
             <button type="submit">添加成员</button>
         </form>
         <p style="margin-top:10px;">
-            {{{{ '% for m in members %' }}}}
-            <span class="tag">{{{{ m.name }}}}</span>
-            {{{{ '% endfor %' }}}}
+            {% for m in members %}
+            <span class="tag">{{ m.name }}</span>
+            {% endfor %}
         </p>
     </div>
 
     <div class="card">
-        <h3>🌴 旅途管理</h3>
-        {{{{ '% if trips %' }}}}
-        <div class="trip-tabs">
-            {{{{ '% for t in trips %' }}}}
-            <a href="/trip/{{{{ t.id }}}}" style="text-decoration:none;">
-                <div class="trip-tab {{{{ 'active' if t.id == current_trip_id else '' }}}}">
-                    <strong>{{{{ t.trip_name }}}}</strong><br>
-                    <small>{{{{ t.start_date }}}} ~ {{{{ t.end_date }}}}</small>
-                </div>
-            </a>
-            {{{{ '% endfor %' }}}}
+        <h3>🌴 旅途列表</h3>
+        {% for t in trips %}
+        <div style="padding:10px; margin:5px 0; background:#f9f9f9; border-radius:8px;">
+            <strong>{{ t.trip_name }}</strong>
+            <span style="color:#999; font-size:12px;">{{ t.start_date }} ~ {{ t.end_date }}</span>
+            {% if t.status == 'active' %}
+            <a href="/trip/{{ t.id }}" style="float:right;">进入 →</a>
+            {% else %}
+            <span style="float:right; color:#999;">已归档</span>
+            {% endif %}
         </div>
-        {{{{ '% endif %' }}}}
-        <button class="secondary btn-small" onclick="showCreateTrip()">+ 新建旅途</button>
-        <div id="createTripForm" style="display:none; margin-top:10px;">
-            <form action="/team/{{{{ team_id }}}}/create_trip" method="post">
+        {% endfor %}
+        
+        <button class="blue small" onclick="document.getElementById('tripForm').style.display='block'" style="margin-top:10px;">+ 新建旅途</button>
+        <div id="tripForm" style="display:none; margin-top:10px;">
+            <form action="/team/{{ team_id }}/create_trip" method="post">
                 <input name="trip_name" placeholder="旅途名称，如：三亚之旅" required>
                 <label>开始日期</label>
                 <input name="start_date" type="date" required>
@@ -241,36 +245,52 @@ TEAM_HTML = f'''<!DOCTYPE html>
             </form>
         </div>
     </div>
+</body>
+</html>'''
 
-    <script>
-        function showCreateTrip() {{
-            document.getElementById('createTripForm').style.display = 'block';
-        }}
-        if ('serviceWorker' in navigator) {{
-            navigator.serviceWorker.register('/static/sw.js');
-        }}
-    </script>
-</body></html>'''
-
-TRIP_HTML = f'''<!DOCTYPE html>
-<html><head>{BASE_HEAD}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<title>{{{{ trip_name }}}} - 旅行记账</title></head>
+TRIP_HTML = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#4CAF50">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>{{ trip_name }} - 旅行记账</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 15px; background: #f5f5f5; }
+        .card { background: white; padding: 15px; margin: 12px 0; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h3 { color: #555; font-size: 16px; margin-bottom: 10px; }
+        input, select, textarea, button { width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+        button { background: #4CAF50; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button.red { background: #f44336; }
+        button.blue { background: #2196F3; }
+        label { display: block; margin-top: 8px; font-weight: bold; color: #555; font-size: 14px; }
+        .nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        a { color: #2196F3; text-decoration: none; }
+        .settle-box { background: #e8f5e9; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .expense-item { padding: 10px; border-bottom: 1px solid #eee; }
+        #map { height: 300px; border-radius: 12px; margin: 10px 0; }
+        .photo-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; cursor: pointer; margin: 5px; }
+    </style>
+</head>
 <body>
     <div class="nav">
-        <a href="/team/{{{{ team_id }}}}">← 团队</a>
-        <h2>🌴 {{{{ trip_name }}}}</h2>
+        <a href="/team/{{ team_id }}">← 团队</a>
+        <h2>🌴 {{ trip_name }}</h2>
     </div>
 
+    <!-- 记账 -->
     <div class="card">
         <h3>💰 记录垫付</h3>
-        <form action="/trip/{{{{ trip_id }}}}/add_expense" method="post">
+        <form action="/trip/{{ trip_id }}/add_expense" method="post">
             <label>谁垫付的？</label>
             <select name="payer_id" required>
-                {{{{ '% for m in members %' }}}}
-                <option value="{{{{ m.id }}}}">{{{{ m.name }}}}</option>
-                {{{{ '% endfor %' }}}}
+                {% for m in members %}
+                <option value="{{ m.id }}">{{ m.name }}</option>
+                {% endfor %}
             </select>
             <label>金额</label>
             <input name="amount" type="number" step="0.01" placeholder="元" required>
@@ -278,100 +298,107 @@ TRIP_HTML = f'''<!DOCTYPE html>
             <input name="note" placeholder="如：晚餐、打车">
             <label>分摊给谁？</label>
             <div>
-            {{{{ '% for m in members %' }}}}
-            <label style="display:inline-block; width:auto; font-weight:normal;">
-                <input type="checkbox" name="sharers" value="{{{{ m.id }}}}" checked> {{{{ m.name }}}}
+            {% for m in members %}
+            <label style="display:inline-block; width:auto; font-weight:normal; margin-right:10px;">
+                <input type="checkbox" name="sharers" value="{{ m.id }}" checked> {{ m.name }}
             </label>
-            {{{{ '% endfor %' }}}}
+            {% endfor %}
             </div>
             <button type="submit">✅ 记录支出</button>
         </form>
     </div>
 
+    <!-- 今日账单 -->
     <div class="card">
-        <h3>📋 今日账单 - {{{{ today }}}}</h3>
-        {{{{ '% for e in today_expenses %' }}}}
+        <h3>📋 今日账单 - {{ today }}</h3>
+        {% for e in today_expenses %}
         <div class="expense-item">
-            <span>{{{{ e.note or '无备注' }}}}</span>
-            <span>{{{{ e.payer_name }}}} 垫付 <strong>¥{{{{ e.amount }}}}</strong></span>
+            <span>{{ e.note or '无备注' }}</span>
+            <span>{{ e.payer_name }} 付 <strong>¥{{ e.amount }}</strong></span>
         </div>
-        {{{{ '% endfor %' }}}}
-        {{{{ '% if not today_expenses %' }}}}
-        <p style="color:#999;">今天还没有记录</p>
-        {{{{ '% endif %' }}}}
+        {% endfor %}
+        {% if not today_expenses %}
+        <p style="color:#999;">今天还没有支出记录</p>
+        {% endif %}
         
-        {{{{ '% if today_expenses %' }}}}
-        <form action="/trip/{{{{ trip_id }}}}/daily_settle" method="post" style="margin-top:10px;">
+        {% if today_expenses %}
+        <form action="/trip/{{ trip_id }}/daily_settle" method="post" style="margin-top:10px;">
             <button type="submit">🧮 今日清账</button>
         </form>
-        {{{{ '% endif %' }}}}
+        {% endif %}
         
-        {{{{ '% if settle_result %' }}}}
+        {% if settle_result %}
         <div class="settle-box">
             <p><strong>💸 转账建议：</strong></p>
-            {{{{ '% for r in settle_result %' }}}}
-            <p>{{{{ r.from }}}} ➡️ {{{{ r.to }}}}：<strong>¥{{{{ r.amount }}}}</strong></p>
-            {{{{ '% endfor %' }}}}
+            {% for r in settle_result %}
+            <p>{{ r.from }} ➡️ {{ r.to }}：<strong>¥{{ r.amount }}</strong></p>
+            {% endfor %}
         </div>
-        {{{{ '% endif %' }}}}
+        {% endif %}
     </div>
 
+    <!-- 清账历史 -->
     <div class="card">
         <h3>📅 清账历史</h3>
-        {{{{ '% for s in settlements %' }}}}
+        {% for s in settlements %}
         <details style="margin:8px 0;">
-            <summary>{{{{ s.settlement_date }}}} - 总计 ¥{{{{ s.total_amount }}}}</summary>
+            <summary>{{ s.settlement_date }} - 总计 ¥{{ s.total_amount }}</summary>
             <div style="padding:10px;">
-            {{{{ '% for r in s.parsed_result %' }}}}
-            <p>{{{{ r.from }}}} ➡️ {{{{ r.to }}}}：¥{{{{ r.amount }}}}</p>
-            {{{{ '% endfor %' }}}}
+            {% for r in s.parsed_result %}
+            <p>{{ r.from }} ➡️ {{ r.to }}：¥{{ r.amount }}</p>
+            {% endfor %}
             </div>
         </details>
-        {{{{ '% endfor %' }}}}
+        {% endfor %}
+        {% if not settlements %}
+        <p style="color:#999;">暂无清账记录</p>
+        {% endif %}
     </div>
 
+    <!-- 足迹地图 -->
     <div class="card">
         <h3>🗺️ 足迹地图</h3>
         <div id="map"></div>
         <h4 style="margin-top:10px;">添加足迹</h4>
-        <form action="/trip/{{{{ trip_id }}}}/add_footprint" method="post" enctype="multipart/form-data">
-            <label>谁记录的？</label>
+        <form action="/trip/{{ trip_id }}/add_footprint" method="post" enctype="multipart/form-data">
+            <label>记录人</label>
             <select name="member_id" required>
-                {{{{ '% for m in members %' }}}}
-                <option value="{{{{ m.id }}}}">{{{{ m.name }}}}</option>
-                {{{{ '% endfor %' }}}}
+                {% for m in members %}
+                <option value="{{ m.id }}">{{ m.name }}</option>
+                {% endfor %}
             </select>
             <input name="city_name" placeholder="城市名，如：三亚" required>
             <input type="text" id="lat_input" name="latitude" placeholder="纬度（自动获取）" readonly>
             <input type="text" id="lng_input" name="longitude" placeholder="经度（自动获取）" readonly>
-            <button type="button" class="secondary btn-small" onclick="getLocation()">📍 获取当前位置</button>
+            <button type="button" class="blue" onclick="getLocation()" style="margin-bottom:6px;">📍 获取当前位置</button>
             <input name="description" placeholder="描述（可选）">
             <label>照片</label>
             <input type="file" name="photo" accept="image/*">
             <button type="submit">📌 记录足迹</button>
         </form>
-        
-        <h4 style="margin-top:15px;">历史足迹</h4>
-        {{{{ '% for fp in footprints %' }}}}
-        <div style="display:inline-block; margin:8px; text-align:center;">
-            {{{{ '% if fp.photo_path %' }}}}
-            <img src="/static/photos/{{{{ fp.photo_path }}}}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;cursor:pointer;" onclick="window.open(this.src)">
-            {{{{ '% else %' }}}}
-            <div style="width:80px;height:80px;background:#eee;border-radius:8px;line-height:80px;font-size:12px;">无图</div>
-            {{{{ '% endif %' }}}}
-            <br><small>{{{{ fp.city_name }}}}<br>{{{{ fp.member_name }}}}</small>
+        <div style="margin-top:10px;">
+            {% for fp in footprints %}
+            <div style="display:inline-block; margin:5px; text-align:center;">
+                {% if fp.photo_path %}
+                <img src="/static/photos/{{ fp.photo_path }}" class="photo-thumb" onclick="window.open(this.src)">
+                {% else %}
+                <div style="width:80px;height:80px;background:#eee;border-radius:8px;line-height:80px;font-size:12px;display:inline-block;">无图</div>
+                {% endif %}
+                <br><small>{{ fp.city_name }}<br>{{ fp.member_name }}</small>
+            </div>
+            {% endfor %}
         </div>
-        {{{{ '% endfor %' }}}}
     </div>
 
+    <!-- 旅行日志 -->
     <div class="card">
         <h3>📝 旅行日志</h3>
-        <form action="/trip/{{{{ trip_id }}}}/add_log" method="post" enctype="multipart/form-data">
+        <form action="/trip/{{ trip_id }}/add_log" method="post" enctype="multipart/form-data">
             <label>作者</label>
             <select name="member_id" required>
-                {{{{ '% for m in members %' }}}}
-                <option value="{{{{ m.id }}}}">{{{{ m.name }}}}</option>
-                {{{{ '% endfor %' }}}}
+                {% for m in members %}
+                <option value="{{ m.id }}">{{ m.name }}</option>
+                {% endfor %}
             </select>
             <input name="title" placeholder="日志标题" required>
             <textarea name="content" rows="4" placeholder="记录今天的美好..."></textarea>
@@ -380,57 +407,73 @@ TRIP_HTML = f'''<!DOCTYPE html>
             <button type="submit">✍️ 发布日志</button>
         </form>
         
-        {{{{ '% for log in logs %' }}}}
-        <div class="card" style="margin:10px 0;">
-            <strong>{{{{ log.title }}}}</strong>
-            <p style="color:#999;font-size:12px;">{{{{ log.member_name }}}} · {{{{ log.log_date }}}}</p>
-            <p>{{{{ log.content }}}}</p>
-            {{{{ '% if log.photo_path %' }}}}
-            <img src="/static/photos/{{{{ log.photo_path }}}}" class="photo-preview" onclick="window.open(this.src)">
-            {{{{ '% endif %' }}}}
+        {% for log in logs %}
+        <div style="background:#f9f9f9; padding:10px; border-radius:8px; margin:10px 0;">
+            <strong>{{ log.title }}</strong>
+            <p style="color:#999;font-size:12px;">{{ log.member_name }} · {{ log.log_date }}</p>
+            <p>{{ log.content }}</p>
+            {% if log.photo_path %}
+            <img src="/static/photos/{{ log.photo_path }}" style="max-width:100%;border-radius:8px;margin-top:5px;" onclick="window.open(this.src)">
+            {% endif %}
         </div>
-        {{{{ '% endfor %' }}}}
+        {% endfor %}
     </div>
 
-    <form action="/trip/{{{{ trip_id }}}}/end" method="post" style="margin-top:15px;">
-        <button class="danger" type="submit" onclick="return confirm('确定结束这次旅途吗？所有记录将被保存。')">🏁 结束旅途并归档</button>
+    <form action="/trip/{{ trip_id }}/end" method="post" style="margin:15px 0;">
+        <button class="red" type="submit" onclick="return confirm('确定结束这次旅途吗？所有记录将被保存。')">🏁 结束旅途并归档</button>
     </form>
 
     <script>
-        // 地图初始化
         var map = L.map('map').setView([35.0, 105.0], 4);
-        L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap'
-        }}).addTo(map);
+        }).addTo(map);
         
-        var footprints = {{{{ footprints_json | safe }}}};
-        footprints.forEach(function(fp) {{
-            if (fp.latitude && fp.longitude) {{
+        var footprints = {{ footprints_json | safe }};
+        footprints.forEach(function(fp) {
+            if (fp.latitude && fp.longitude) {
                 var marker = L.marker([fp.latitude, fp.longitude]).addTo(map);
                 var html = '<b>' + fp.city_name + '</b><br>' + (fp.description || '') + '<br>by ' + fp.member_name;
                 if (fp.photo_path) html += '<br><img src="/static/photos/' + fp.photo_path + '" style="max-width:150px;margin-top:5px;border-radius:5px;">';
                 marker.bindPopup(html);
-            }}
-        }});
+            }
+        });
         
-        function getLocation() {{
-            if (navigator.geolocation) {{
-                navigator.geolocation.getCurrentPosition(function(pos) {{
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(pos) {
                     document.getElementById('lat_input').value = pos.coords.latitude;
                     document.getElementById('lng_input').value = pos.coords.longitude;
                     map.setView([pos.coords.latitude, pos.coords.longitude], 12);
                     L.marker([pos.coords.latitude, pos.coords.longitude]).addTo(map).bindPopup('当前位置').openPopup();
-                }});
-            }} else {{
+                });
+            } else {
                 alert('浏览器不支持定位，请手动输入经纬度');
-            }}
-        }}
-        
-        if ('serviceWorker' in navigator) {{
-            navigator.serviceWorker.register('/static/sw.js');
-        }}
+            }
+        }
     </script>
-</body></html>'''
+</body>
+</html>'''
+
+ERROR_HTML = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错误</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }
+        .error { background: #ffebee; padding: 30px; border-radius: 12px; }
+        a { color: #2196F3; }
+    </style>
+</head>
+<body>
+    <div class="error">
+        <h2>⚠️ {{ message }}</h2>
+        <p><a href="/">返回首页</a></p>
+    </div>
+</body>
+</html>'''
 
 # ---------- 路由 ----------
 @app.route('/')
@@ -439,26 +482,30 @@ def index():
 
 @app.route('/create', methods=['POST'])
 def create():
-    team = request.form['team'].strip()
+    team = request.form.get('team', '').strip()
+    if not team:
+        return render_template_string(ERROR_HTML, message="团队名不能为空")
     conn = sqlite3.connect('travel.db')
     try:
         conn.execute('INSERT INTO teams (name) VALUES (?)', (team,))
         conn.commit()
         tid = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()[0]
-    except:
+    except sqlite3.IntegrityError:
         conn.close()
-        return "❌ 团队名已存在，请换一个", 400
+        return render_template_string(ERROR_HTML, message="团队名已存在，请换一个")
     conn.close()
     return redirect(url_for('team_page', team_id=tid))
 
 @app.route('/join', methods=['POST'])
 def join():
-    team = request.form['team'].strip()
+    team = request.form.get('team', '').strip()
+    if not team:
+        return render_template_string(ERROR_HTML, message="请输入团队名称")
     conn = sqlite3.connect('travel.db')
     tid = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()
     conn.close()
     if not tid:
-        return "❌ 团队不存在，请先创建", 404
+        return render_template_string(ERROR_HTML, message="团队不存在，请先创建")
     return redirect(url_for('team_page', team_id=tid[0]))
 
 @app.route('/team/<int:team_id>')
@@ -467,37 +514,38 @@ def team_page(team_id):
     team = conn.execute('SELECT * FROM teams WHERE id=?', (team_id,)).fetchone()
     if not team:
         conn.close()
-        return "团队不存在", 404
+        return render_template_string(ERROR_HTML, message="团队不存在")
     members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
     trips = conn.execute('SELECT * FROM trips WHERE team_id=? ORDER BY start_date DESC', (team_id,)).fetchall()
     conn.close()
-    return render_template_string(TEAM_HTML, 
-                                team_id=team_id, 
+    return render_template_string(TEAM_HTML,
+                                team_id=team_id,
                                 team_name=team['name'],
-                                members=members, 
-                                trips=trips,
-                                current_trip_id=None)
+                                members=members,
+                                trips=trips)
 
 @app.route('/team/<int:team_id>/add_member', methods=['POST'])
 def add_member(team_id):
-    name = request.form['name'].strip()
+    name = request.form.get('name', '').strip()
     if not name:
-        return "名字不能为空", 400
+        return render_template_string(ERROR_HTML, message="名字不能为空")
     conn = sqlite3.connect('travel.db')
     try:
         conn.execute('INSERT INTO members (team_id, name) VALUES (?,?)', (team_id, name))
         conn.commit()
-    except:
+    except sqlite3.IntegrityError:
         conn.close()
-        return "❌ 该成员已存在", 400
+        return render_template_string(ERROR_HTML, message="该成员已存在")
     conn.close()
     return redirect(url_for('team_page', team_id=team_id))
 
 @app.route('/team/<int:team_id>/create_trip', methods=['POST'])
 def create_trip(team_id):
-    name = request.form['trip_name'].strip()
-    start = request.form['start_date']
-    end = request.form['end_date']
+    name = request.form.get('trip_name', '').strip()
+    start = request.form.get('start_date', '')
+    end = request.form.get('end_date', '')
+    if not name or not start or not end:
+        return render_template_string(ERROR_HTML, message="请填写完整信息")
     conn = sqlite3.connect('travel.db')
     conn.execute('INSERT INTO trips (team_id, trip_name, start_date, end_date) VALUES (?,?,?,?)',
                  (team_id, name, start, end))
@@ -511,15 +559,13 @@ def trip_page(trip_id):
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     if not trip:
         conn.close()
-        return "旅途不存在", 404
+        return render_template_string(ERROR_HTML, message="旅途不存在")
     
     team_id = trip['team_id']
-    team = conn.execute('SELECT * FROM teams WHERE id=?', (team_id,)).fetchone()
     members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
     
     today = date.today().isoformat()
     
-    # 今日未清账的支出
     today_expenses = conn.execute('''
         SELECT e.*, m.name as payer_name 
         FROM expenses e 
@@ -528,24 +574,17 @@ def trip_page(trip_id):
         ORDER BY e.created_at DESC
     ''', (trip_id, today)).fetchall()
     
-    # 清账历史
-    settlements = conn.execute('''
-        SELECT * FROM daily_settlements WHERE trip_id=? ORDER BY settlement_date DESC
-    ''', (trip_id,)).fetchall()
-    settlements_list = []
-    for s in settlements:
-        settlements_list.append({
+    settlements_raw = conn.execute('SELECT * FROM daily_settlements WHERE trip_id=? ORDER BY settlement_date DESC', (trip_id,)).fetchall()
+    settlements = []
+    for s in settlements_raw:
+        settlements.append({
             'settlement_date': s['settlement_date'],
             'total_amount': s['total_amount'],
             'parsed_result': json.loads(s['result_json'])
         })
     
-    # 足迹
     footprints = conn.execute('SELECT * FROM footprints WHERE trip_id=? ORDER BY created_at DESC', (trip_id,)).fetchall()
-    
-    # 日志
     logs = conn.execute('SELECT * FROM travel_logs WHERE trip_id=? ORDER BY created_at DESC', (trip_id,)).fetchall()
-    
     conn.close()
     
     footprints_json = json.dumps([dict(fp) for fp in footprints], ensure_ascii=False, default=str)
@@ -554,11 +593,10 @@ def trip_page(trip_id):
                                 trip_id=trip_id,
                                 trip_name=trip['trip_name'],
                                 team_id=team_id,
-                                team_name=team['name'],
                                 members=members,
                                 today=today,
                                 today_expenses=today_expenses,
-                                settlements=settlements_list,
+                                settlements=settlements,
                                 settle_result=None,
                                 footprints=footprints,
                                 footprints_json=footprints_json,
@@ -566,26 +604,34 @@ def trip_page(trip_id):
 
 @app.route('/trip/<int:trip_id>/add_expense', methods=['POST'])
 def add_expense(trip_id):
-    payer_id = int(request.form['payer_id'])
-    amount = float(request.form['amount'])
+    payer_id = int(request.form.get('payer_id', 0))
+    amount = float(request.form.get('amount', 0))
     note = request.form.get('note', '')
-    sharer_ids = [int(x) for x in request.form.getlist('sharers')]
+    sharer_ids = request.form.getlist('sharers')
+    
+    if not sharer_ids or amount <= 0:
+        return render_template_string(ERROR_HTML, message="请填写完整的支出信息")
     
     conn = sqlite3.connect('travel.db')
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     team_id = trip['team_id']
     
     payer = conn.execute('SELECT * FROM members WHERE id=?', (payer_id,)).fetchone()
+    if not payer:
+        conn.close()
+        return render_template_string(ERROR_HTML, message="付款人不存在")
     
-    conn.execute('INSERT INTO expenses (trip_id, team_id, payer_id, payer_name, amount, note, expense_date) VALUES (?,?,?,?,?,?,?)',
+    conn.execute('''INSERT INTO expenses (trip_id, team_id, payer_id, payer_name, amount, note, expense_date)
+                    VALUES (?,?,?,?,?,?,?)''',
                  (trip_id, team_id, payer_id, payer['name'], amount, note, date.today().isoformat()))
     expense_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
     
     share = round(amount / len(sharer_ids), 2)
     for sid in sharer_ids:
-        member = conn.execute('SELECT * FROM members WHERE id=?', (sid,)).fetchone()
-        conn.execute('INSERT INTO expense_shares (expense_id, member_id, member_name, share) VALUES (?,?,?,?)',
-                     (expense_id, sid, member['name'], share))
+        member = conn.execute('SELECT * FROM members WHERE id=?', (int(sid),)).fetchone()
+        if member:
+            conn.execute('INSERT INTO expense_shares (expense_id, member_id, member_name, share) VALUES (?,?,?,?)',
+                         (expense_id, int(sid), member['name'], share))
     conn.commit()
     conn.close()
     return redirect(url_for('trip_page', trip_id=trip_id))
@@ -595,7 +641,6 @@ def daily_settle(trip_id):
     today = date.today().isoformat()
     conn = sqlite3.connect('travel.db')
     
-    # 获取今日未清账支出
     expenses = conn.execute('''
         SELECT * FROM expenses 
         WHERE trip_id=? AND expense_date=? AND settlement_id IS NULL
@@ -605,23 +650,18 @@ def daily_settle(trip_id):
         conn.close()
         return redirect(url_for('trip_page', trip_id=trip_id))
     
-    # 计算结算
     paid = defaultdict(float)
     owed = defaultdict(float)
-    member_names = {}
     
     for e in expenses:
         paid[e['payer_name']] += e['amount']
         shares = conn.execute('SELECT * FROM expense_shares WHERE expense_id=?', (e['id'],)).fetchall()
         for s in shares:
             owed[s['member_name']] += s['share']
-            member_names[s['member_name']] = True
     
-    net = {}
-    for name in set(list(paid.keys()) + list(owed.keys())):
-        net[name] = round(paid.get(name, 0) - owed.get(name, 0), 2)
+    all_names = set(list(paid.keys()) + list(owed.keys()))
+    net = {name: round(paid.get(name, 0) - owed.get(name, 0), 2) for name in all_names}
     
-    # 生成转账建议
     creditors = [(n, net[n]) for n in net if net[n] > 0.01]
     debtors = [(n, -net[n]) for n in net if net[n] < -0.01]
     result = []
@@ -639,63 +679,55 @@ def daily_settle(trip_id):
     
     total_amount = sum(e['amount'] for e in expenses)
     
-    # 保存清账记录
     conn.execute('INSERT INTO daily_settlements (trip_id, settlement_date, total_amount, result_json) VALUES (?,?,?,?)',
                  (trip_id, today, total_amount, json.dumps(result, ensure_ascii=False)))
     settlement_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
     
-    # 标记支出为已清账
     for e in expenses:
         conn.execute('UPDATE expenses SET settlement_id=? WHERE id=?', (settlement_id, e['id']))
     
     conn.commit()
-    conn.close()
     
-    # 重定向并显示结果
-    return redirect(url_for('trip_page_with_settle', trip_id=trip_id, settle_result=json.dumps(result)))
-
-@app.route('/trip/<int:trip_id>/settle-result')
-def trip_page_with_settle(trip_id):
-    settle_result = json.loads(request.args.get('settle_result', '[]'))
-    conn = sqlite3.connect('travel.db')
+    # 重新获取页面数据
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     team_id = trip['team_id']
     members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
-    today = date.today().isoformat()
-    today_expenses = conn.execute('''
-        SELECT e.*, m.name as payer_name 
-        FROM expenses e 
-        JOIN members m ON e.payer_id = m.id 
-        WHERE e.trip_id=? AND e.expense_date=? AND e.settlement_id IS NULL
-        ORDER BY e.created_at DESC
-    ''', (trip_id, today)).fetchall()
-    settlements = conn.execute('SELECT * FROM daily_settlements WHERE trip_id=? ORDER BY settlement_date DESC', (trip_id,)).fetchall()
-    settlements_list = [{
+    today_expenses = []
+    settlements_raw = conn.execute('SELECT * FROM daily_settlements WHERE trip_id=? ORDER BY settlement_date DESC', (trip_id,)).fetchall()
+    settlements = [{
         'settlement_date': s['settlement_date'],
         'total_amount': s['total_amount'],
         'parsed_result': json.loads(s['result_json'])
-    } for s in settlements]
+    } for s in settlements_raw]
     footprints = conn.execute('SELECT * FROM footprints WHERE trip_id=? ORDER BY created_at DESC', (trip_id,)).fetchall()
     logs = conn.execute('SELECT * FROM travel_logs WHERE trip_id=? ORDER BY created_at DESC', (trip_id,)).fetchall()
     conn.close()
+    
     footprints_json = json.dumps([dict(fp) for fp in footprints], ensure_ascii=False, default=str)
+    
     return render_template_string(TRIP_HTML,
                                 trip_id=trip_id, trip_name=trip['trip_name'],
-                                team_id=team_id, team_name='', members=members,
+                                team_id=team_id, members=members,
                                 today=today, today_expenses=today_expenses,
-                                settlements=settlements_list, settle_result=settle_result,
+                                settlements=settlements, settle_result=result,
                                 footprints=footprints, footprints_json=footprints_json, logs=logs)
 
 @app.route('/trip/<int:trip_id>/add_footprint', methods=['POST'])
 def add_footprint(trip_id):
-    member_id = int(request.form['member_id'])
-    city_name = request.form['city_name'].strip()
-    latitude = request.form.get('latitude')
-    longitude = request.form.get('longitude')
+    member_id = int(request.form.get('member_id', 0))
+    city_name = request.form.get('city_name', '').strip()
+    latitude = request.form.get('latitude', '')
+    longitude = request.form.get('longitude', '')
     description = request.form.get('description', '')
+    
+    if not city_name:
+        return render_template_string(ERROR_HTML, message="请输入城市名")
     
     conn = sqlite3.connect('travel.db')
     member = conn.execute('SELECT * FROM members WHERE id=?', (member_id,)).fetchone()
+    if not member:
+        conn.close()
+        return render_template_string(ERROR_HTML, message="成员不存在")
     
     lat = float(latitude) if latitude else None
     lng = float(longitude) if longitude else None
@@ -708,47 +740,4 @@ def add_footprint(trip_id):
             file.save(os.path.join(UPLOAD_FOLDER, filename))
             photo_path = filename
     
-    conn.execute('''INSERT INTO footprints (trip_id, member_id, member_name, city_name, latitude, longitude, photo_path, description)
-                    VALUES (?,?,?,?,?,?,?,?)''',
-                 (trip_id, member_id, member['name'], city_name, lat, lng, photo_path, description))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('trip_page', trip_id=trip_id))
-
-@app.route('/trip/<int:trip_id>/add_log', methods=['POST'])
-def add_log(trip_id):
-    member_id = int(request.form['member_id'])
-    title = request.form['title'].strip()
-    content = request.form.get('content', '')
-    
-    conn = sqlite3.connect('travel.db')
-    member = conn.execute('SELECT * FROM members WHERE id=?', (member_id,)).fetchone()
-    
-    photo_path = None
-    if 'photo' in request.files:
-        file = request.files['photo']
-        if file and file.filename and allowed_file(file.filename):
-            filename = uuid.uuid4().hex + '_' + secure_filename(file.filename)
-            file.save(os.path.join(UPLOAD_FOLDER, filename))
-            photo_path = filename
-    
-    conn.execute('''INSERT INTO travel_logs (trip_id, member_id, member_name, title, content, photo_path, log_date)
-                    VALUES (?,?,?,?,?,?,?)''',
-                 (trip_id, member_id, member['name'], title, content, photo_path, date.today().isoformat()))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('trip_page', trip_id=trip_id))
-
-@app.route('/trip/<int:trip_id>/end', methods=['POST'])
-def end_trip(trip_id):
-    conn = sqlite3.connect('travel.db')
-    conn.execute("UPDATE trips SET status='archived' WHERE id=?", (trip_id,))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('team_page', team_id=request.args.get('team_id', 1)))
-
-# ---------- 启动 ----------
-if __name__ == '__main__':
-    init_db()
-    create_pwa_files()
-    app.run(host='0.0.0.0', port=5000)
+    conn.execute('''INSERT INTO footprints (trip_id,
