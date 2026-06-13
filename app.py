@@ -334,6 +334,15 @@ TRIP_HTML = '''<!DOCTYPE html>
             {% endfor %}
         </div>
         {% endif %}
+        
+        {% if personal_summary %}
+        <div class="settle-box" style="margin-top:8px;">
+            <p style="font-weight:600; margin-bottom:6px;">今日个人花销</p>
+            {% for p in personal_summary %}
+            <p>{{ p.name }} 消费 <strong style="color:#0390B3;">¥{{ "%.2f" % p.spent }}</strong></p>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
     <div class="card">
@@ -414,6 +423,15 @@ TRIP_HTML = '''<!DOCTYPE html>
         </div>
         {% endfor %}
     </div>
+
+    {% if personal_total %}
+    <div class="card">
+        <h3>旅途总花销</h3>
+        {% for p in personal_total %}
+        <p style="padding:4px 0; font-size:14px;">{{ p.name }} 累计消费 <strong style="color:#0390B3;">¥{{ "%.2f" % p.spent }}</strong></p>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <form action="/trip/{{ trip_id }}/end" method="post" style="margin:12px 0;">
         <button class="danger" type="submit" onclick="return confirm('确定结束旅途？记录将被保存。')">结束旅途并归档</button>
@@ -551,6 +569,17 @@ def trip_page(trip_id):
     
     footprints = conn.execute('SELECT * FROM footprints WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
     logs = conn.execute('SELECT * FROM travel_logs WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
+    
+    # 计算每个人旅途累计花销（分摊金额）
+    all_shares = conn.execute('''
+        SELECT es.member_name, SUM(es.share) as total_spent
+        FROM expense_shares es
+        JOIN expenses e ON es.expense_id = e.id
+        WHERE e.trip_id=?
+        GROUP BY es.member_name
+    ''', (trip_id,)).fetchall()
+    personal_total = [{'name': s['member_name'], 'spent': round(s['total_spent'], 2)} for s in all_shares]
+    
     conn.close()
     
     fp_json = []
@@ -568,6 +597,7 @@ def trip_page(trip_id):
         trip_id=trip_id, trip_name=trip['trip_name'], team_id=team_id,
         members=members, today=today, today_expenses=today_expenses,
         settlements=settlements, settle_result=None,
+        personal_summary=None, personal_total=personal_total,
         footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False),
         logs=logs)
 
@@ -647,6 +677,14 @@ def daily_settle(trip_id):
     for e in expenses:
         conn.execute('UPDATE expenses SET settlement_id=? WHERE id=?', (settle_id, e['id']))
     
+    # 计算每个人今天各自花销（分摊金额）
+    personal_today = defaultdict(float)
+    for e in expenses:
+        shares = conn.execute('SELECT * FROM expense_shares WHERE expense_id=?', (e['id'],)).fetchall()
+        for s in shares:
+            personal_today[s['member_name']] += s['share']
+    personal_summary = [{'name': n, 'spent': round(a, 2)} for n, a in personal_today.items()]
+    
     conn.commit()
     
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
@@ -657,6 +695,17 @@ def daily_settle(trip_id):
     settlements = [{'settlement_date': s['settlement_date'], 'total_amount': s['total_amount'], 'parsed_result': json.loads(s['result_json'])} for s in settlements_raw]
     footprints = conn.execute('SELECT * FROM footprints WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
     logs = conn.execute('SELECT * FROM travel_logs WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
+    
+    # 旅途累计花销
+    all_shares = conn.execute('''
+        SELECT es.member_name, SUM(es.share) as total_spent
+        FROM expense_shares es
+        JOIN expenses e ON es.expense_id = e.id
+        WHERE e.trip_id=?
+        GROUP BY es.member_name
+    ''', (trip_id,)).fetchall()
+    personal_total = [{'name': s['member_name'], 'spent': round(s['total_spent'], 2)} for s in all_shares]
+    
     conn.close()
     
     fp_json = [{'city_name':f['city_name'],'latitude':f['latitude'],'longitude':f['longitude'],'photo_path':f['photo_path'],'description':f['description'],'member_name':f['member_name']} for f in footprints]
@@ -665,6 +714,7 @@ def daily_settle(trip_id):
         trip_id=trip_id, trip_name=trip['trip_name'], team_id=team_id,
         members=members, today=today, today_expenses=today_expenses,
         settlements=settlements, settle_result=result,
+        personal_summary=personal_summary, personal_total=personal_total,
         footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False),
         logs=logs)
 
