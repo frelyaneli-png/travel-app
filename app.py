@@ -119,7 +119,6 @@ HOME_HTML = '''<!DOCTYPE html>
         .trip-item { padding: 14px; margin: 6px 0; background: #fafafa; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
         .trip-item strong { font-size: 15px; }
         .trip-item span { font-size: 12px; color: #999; }
-        .hidden-form { display: none; margin-top: 10px; padding: 16px; background: #fafafa; border-radius: 12px; }
         .empty { color: #bbb; font-size: 14px; text-align: center; padding: 16px 0; }
         .error-msg { color: #e74c3c; font-size: 13px; margin-top: 4px; display: none; }
     </style>
@@ -171,15 +170,6 @@ HOME_HTML = '''<!DOCTYPE html>
             });
             html += '<button class="sm outline" onclick="clearMyTrips()">清除记录</button></div>';
             container.innerHTML = html;
-        }
-        
-        function saveTrip(id, name, start, end, status) {
-            var trips = JSON.parse(localStorage.getItem(storageKey) || '[]');
-            trips = trips.filter(function(t) { return t.id !== id; });
-            trips.unshift({id: id, name: name, start: start, end: end, status: status});
-            if (trips.length > 10) trips = trips.slice(0, 10);
-            localStorage.setItem(storageKey, JSON.stringify(trips));
-            loadMyTrips();
         }
         
         function clearMyTrips() {
@@ -246,6 +236,7 @@ TRIP_HTML = '''<!DOCTYPE html>
         .identity-bar select { width: auto; padding: 6px 10px; margin: 0; font-size: 14px; }
         .identity-bar span { font-weight: 600; color: #0390B3; }
         .tag { display: inline-block; background: #e8f4f8; color: #0390B3; padding: 5px 14px; border-radius: 20px; margin: 3px; font-size: 13px; font-weight: 500; }
+        select[readonly] { pointer-events: none; background-color: #f0f0f0; }
     </style>
 </head>
 <body>
@@ -498,7 +489,7 @@ TRIP_HTML = '''<!DOCTYPE html>
                 var logAuthor = document.getElementById('logAuthor');
                 if (logAuthor) {
                     logAuthor.value = val;
-                    logAuthor.disabled = true;
+                    logAuthor.setAttribute('readonly', true);
                 }
                 var fpMember = document.getElementById('footprintMember');
                 if (fpMember) fpMember.value = val;
@@ -514,7 +505,7 @@ TRIP_HTML = '''<!DOCTYPE html>
                 var logAuthor = document.getElementById('logAuthor');
                 if (logAuthor) {
                     logAuthor.value = saved;
-                    logAuthor.disabled = true;
+                    logAuthor.setAttribute('readonly', true);
                 }
                 var fpMember = document.getElementById('footprintMember');
                 if (fpMember) fpMember.value = saved;
@@ -713,8 +704,7 @@ def add_log(trip_id):
     member_name = request.form.get('member_name', '')
     title = request.form.get('title', '').strip()
     content = request.form.get('content', '')
-    if not title: return "请输入标题", 400
-    if not member_name: return "请选择作者", 400
+    if not title or not member_name: return "请填写完整信息", 400
     conn = get_db()
     if conn.execute('SELECT status FROM trips WHERE id=?', (trip_id,)).fetchone()['status'] == 'archived': conn.close(); return "已归档", 400
     photo_path = None
@@ -728,7 +718,7 @@ def add_log(trip_id):
     conn.commit()
     conn.close()
     return redirect(url_for('trip_page', trip_id=trip_id))
-    
+
 @app.route('/trip/<int:trip_id>/end', methods=['POST'])
 def end_trip(trip_id):
     conn = get_db()
