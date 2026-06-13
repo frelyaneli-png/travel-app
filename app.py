@@ -3,7 +3,7 @@ import sqlite3
 import os
 import json
 import uuid
-from datetime import date
+from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from werkzeug.utils import secure_filename
 
@@ -21,6 +21,11 @@ def get_db():
     conn = sqlite3.connect('travel.db')
     conn.row_factory = sqlite3.Row
     return conn
+
+def today_beijing():
+    """返回北京时间今天的日期字符串"""
+    tz = timezone(timedelta(hours=8))
+    return datetime.now(tz).strftime('%Y-%m-%d')
 
 # ---------- 数据库初始化 ----------
 def init_db():
@@ -130,14 +135,14 @@ HOME_HTML = '''<!DOCTYPE html>
         <p>多人联机 · 实时同步</p>
     </div>
     <div class="card">
-        <h3>✨ 创建新团队</h3>
+        <h3>创建新团队</h3>
         <form action="/create" method="post">
             <input name="team" placeholder="输入团队名称" required>
             <button type="submit">创建团队</button>
         </form>
     </div>
     <div class="card">
-        <h3>🔗 加入已有团队</h3>
+        <h3>加入已有团队</h3>
         <form action="/join" method="post">
             <input name="team" placeholder="输入已有团队名称" required>
             <button type="submit" class="outline">加入团队</button>
@@ -183,7 +188,7 @@ TEAM_HTML = '''<!DOCTYPE html>
     </div>
 
     <div class="card">
-        <h3>👤 成员管理</h3>
+        <h3>成员管理</h3>
         <form action="/team/{{ team_id }}/add_member" method="post" style="display:flex; gap:8px;">
             <input name="name" placeholder="新成员姓名" required style="flex:1;">
             <button type="submit" class="sm" style="margin:5px 0;">添加</button>
@@ -196,7 +201,7 @@ TEAM_HTML = '''<!DOCTYPE html>
     </div>
 
     <div class="card">
-        <h3>🌴 旅途列表</h3>
+        <h3>旅途列表</h3>
         {% for t in trips %}
         <div class="trip-item">
             <div>
@@ -279,7 +284,7 @@ TRIP_HTML = '''<!DOCTYPE html>
     </div>
 
     <div class="card">
-        <h3>💰 记录垫付</h3>
+        <h3>记录垫付</h3>
         <form action="/trip/{{ trip_id }}/add_expense" method="post">
             <label>付款人</label>
             <select name="payer" required>
@@ -304,7 +309,7 @@ TRIP_HTML = '''<!DOCTYPE html>
     </div>
 
     <div class="card">
-        <h3>📋 今日账单 · {{ today }}</h3>
+        <h3>今日账单 · {{ today }}</h3>
         {% for e in today_expenses %}
         <div class="expense-item">
             <span>{{ e.note or '无备注' }}</span>
@@ -317,13 +322,13 @@ TRIP_HTML = '''<!DOCTYPE html>
         
         {% if today_expenses %}
         <form action="/trip/{{ trip_id }}/daily_settle" method="post" style="margin-top:10px;">
-            <button type="submit">🧮 今日清账</button>
+            <button type="submit">今日清账</button>
         </form>
         {% endif %}
         
         {% if settle_result %}
         <div class="settle-box">
-            <p style="font-weight:600; margin-bottom:6px;">💸 转账建议</p>
+            <p style="font-weight:600; margin-bottom:6px;">转账建议</p>
             {% for r in settle_result %}
             <p>{{ r.from }} → {{ r.to }} <strong style="color:#0390B3;">¥{{ "%.2f" % r.amount }}</strong></p>
             {% endfor %}
@@ -332,7 +337,7 @@ TRIP_HTML = '''<!DOCTYPE html>
     </div>
 
     <div class="card">
-        <h3>📅 清账记录</h3>
+        <h3>清账记录</h3>
         {% for s in settlements %}
         <details>
             <summary>{{ s.settlement_date }} · ¥{{ "%.2f" % s.total_amount }}</summary>
@@ -349,7 +354,7 @@ TRIP_HTML = '''<!DOCTYPE html>
     </div>
 
     <div class="card">
-        <h3>🗺️ 足迹地图</h3>
+        <h3>足迹地图</h3>
         <div id="map"></div>
         <h4 style="font-size:14px; font-weight:600; margin-top:10px;">添加足迹</h4>
         <form action="/trip/{{ trip_id }}/add_footprint" method="post" enctype="multipart/form-data">
@@ -360,7 +365,7 @@ TRIP_HTML = '''<!DOCTYPE html>
                 {% endfor %}
             </select>
             <input name="city_name" placeholder="城市名，如：三亚" required>
-            <button type="button" class="outline sm" onclick="getLocation()">📍 获取位置</button>
+            <button type="button" class="outline sm" onclick="getLocation()">获取位置</button>
             <input type="hidden" name="latitude" id="lat_input">
             <input type="hidden" name="longitude" id="lng_input">
             <input name="description" placeholder="一句话描述（可选）">
@@ -383,7 +388,7 @@ TRIP_HTML = '''<!DOCTYPE html>
     </div>
 
     <div class="card">
-        <h3>📝 旅行日志</h3>
+        <h3>旅行日志</h3>
         <form action="/trip/{{ trip_id }}/add_log" method="post" enctype="multipart/form-data">
             <label>作者</label>
             <select name="member_name" required>
@@ -411,7 +416,7 @@ TRIP_HTML = '''<!DOCTYPE html>
     </div>
 
     <form action="/trip/{{ trip_id }}/end" method="post" style="margin:12px 0;">
-        <button class="danger" type="submit" onclick="return confirm('确定结束旅途？记录将被保存。')">🏁 结束旅途并归档</button>
+        <button class="danger" type="submit" onclick="return confirm('确定结束旅途？记录将被保存。')">结束旅途并归档</button>
     </form>
 
     <script>
@@ -434,7 +439,7 @@ TRIP_HTML = '''<!DOCTYPE html>
                     document.getElementById('lat_input').value = p.coords.latitude;
                     document.getElementById('lng_input').value = p.coords.longitude;
                     map.setView([p.coords.latitude, p.coords.longitude], 13);
-                    L.marker([p.coords.latitude, p.coords.longitude]).addTo(map).bindPopup('📍 当前位置').openPopup();
+                    L.marker([p.coords.latitude, p.coords.longitude]).addTo(map).bindPopup('当前位置').openPopup();
                 });
             } else { alert('请允许定位'); }
         }
@@ -527,7 +532,7 @@ def trip_page(trip_id):
     
     team_id = trip['team_id']
     members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
-    today = date.today().isoformat()
+    today = today_beijing()
     
     today_expenses = conn.execute('''
         SELECT * FROM expenses 
@@ -579,7 +584,7 @@ def add_expense(trip_id):
     conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     team_id = trip['team_id']
-    today = date.today().isoformat()
+    today = today_beijing()
     
     conn.execute('INSERT INTO expenses (trip_id, team_id, payer_name, amount, note, expense_date) VALUES (?,?,?,?,?,?)',
                  (trip_id, team_id, payer, amount, note, today))
@@ -595,7 +600,7 @@ def add_expense(trip_id):
 
 @app.route('/trip/<int:trip_id>/daily_settle', methods=['POST'])
 def daily_settle(trip_id):
-    today = date.today().isoformat()
+    today = today_beijing()
     conn = get_db()
     
     expenses = conn.execute('''
@@ -711,7 +716,7 @@ def add_log(trip_id):
     
     conn = get_db()
     conn.execute('INSERT INTO travel_logs (trip_id, member_name, title, content, photo_path, log_date) VALUES (?,?,?,?,?,?)',
-                 (trip_id, member_name, title, content, photo_path, date.today().isoformat()))
+                 (trip_id, member_name, title, content, photo_path, today_beijing()))
     conn.commit()
     conn.close()
     return redirect(url_for('trip_page', trip_id=trip_id))
