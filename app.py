@@ -247,6 +247,11 @@ TRIP_HTML = '''<!DOCTYPE html>
         .header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
         .header a { color: #0390B3; text-decoration: none; font-size: 14px; font-weight: 500; }
         .header h2 { font-size: 18px; font-weight: 700; }
+        .tabs { display: flex; gap: 0; margin-bottom: 14px; background: #fff; border-radius: 12px; padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .tab { flex: 1; text-align: center; padding: 10px 0; font-size: 14px; font-weight: 600; color: #999; cursor: pointer; border-radius: 10px; transition: all 0.2s; }
+        .tab.active { background: #0390B3; color: #fff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
         .card { background: #fff; padding: 18px; margin: 10px 0; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
         .card h3 { font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 10px; }
         input, select, textarea, button { width: 100%; padding: 11px 14px; margin: 5px 0; border: 1.5px solid #e8e8e8; border-radius: 10px; font-size: 15px; background: #fafafa; color: #1a1a1a; }
@@ -283,161 +288,186 @@ TRIP_HTML = '''<!DOCTYPE html>
         <h2>🌴 {{ trip_name }}</h2>
     </div>
 
-    <div class="card">
-        <h3>记录垫付</h3>
-        <form action="/trip/{{ trip_id }}/add_expense" method="post">
-            <label>付款人</label>
-            <select name="payer" required>
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('accounting')">记账</div>
+        <div class="tab" onclick="switchTab('diary')">日志与足迹</div>
+    </div>
+
+    <!-- 记账标签页 -->
+    <div id="tab-accounting" class="tab-content active">
+        <div class="card">
+            <h3>记录垫付</h3>
+            <form action="/trip/{{ trip_id }}/add_expense" method="post">
+                <label>付款人</label>
+                <select name="payer" required>
+                    {% for m in members %}
+                    <option value="{{ m.name }}">{{ m.name }}</option>
+                    {% endfor %}
+                </select>
+                <label>金额（元）</label>
+                <input name="amount" type="number" step="0.01" placeholder="0.00" required>
+                <label>备注</label>
+                <input name="note" placeholder="如：晚餐、打车">
+                <label>分摊成员</label>
+                <div class="checkbox-row">
                 {% for m in members %}
-                <option value="{{ m.name }}">{{ m.name }}</option>
+                <label>
+                    <input type="checkbox" name="sharers" value="{{ m.name }}" checked> {{ m.name }}
+                </label>
                 {% endfor %}
-            </select>
-            <label>金额（元）</label>
-            <input name="amount" type="number" step="0.01" placeholder="0.00" required>
-            <label>备注</label>
-            <input name="note" placeholder="如：晚餐、打车">
-            <label>分摊成员</label>
-            <div class="checkbox-row">
-            {% for m in members %}
-            <label>
-                <input type="checkbox" name="sharers" value="{{ m.name }}" checked> {{ m.name }}
-            </label>
-            {% endfor %}
-            </div>
-            <button type="submit">记录支出</button>
-        </form>
-    </div>
-
-    <div class="card">
-        <h3>今日账单 · {{ today }}</h3>
-        {% for e in today_expenses %}
-        <div class="expense-item">
-            <span>{{ e.note or '无备注' }}</span>
-            <span>{{ e.payer_name }} 付 <strong style="color:#0390B3;">¥{{ "%.2f" % e.amount }}</strong></span>
+                </div>
+                <button type="submit">记录支出</button>
+            </form>
         </div>
-        {% endfor %}
-        {% if not today_expenses %}
-        <div class="empty">今天还没有支出</div>
-        {% endif %}
-        
-        {% if today_expenses %}
-        <form action="/trip/{{ trip_id }}/daily_settle" method="post" style="margin-top:10px;">
-            <button type="submit">今日清账</button>
-        </form>
-        {% endif %}
-        
-        {% if settle_result %}
-        <div class="settle-box">
-            <p style="font-weight:600; margin-bottom:6px;">转账建议</p>
-            {% for r in settle_result %}
-            <p>{{ r.from }} → {{ r.to }} <strong style="color:#0390B3;">¥{{ "%.2f" % r.amount }}</strong></p>
-            {% endfor %}
-        </div>
-        {% endif %}
-        
-        {% if personal_summary %}
-        <div class="settle-box" style="margin-top:8px;">
-            <p style="font-weight:600; margin-bottom:6px;">今日个人花销</p>
-            {% for p in personal_summary %}
-            <p>{{ p.name }} 消费 <strong style="color:#0390B3;">¥{{ "%.2f" % p.spent }}</strong></p>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
 
-    <div class="card">
-        <h3>清账记录</h3>
-        {% for s in settlements %}
-        <details>
-            <summary>{{ s.settlement_date }} · ¥{{ "%.2f" % s.total_amount }}</summary>
-            <div style="padding:8px 14px;">
-            {% for r in s.parsed_result %}
-            <p style="font-size:14px; padding:2px 0;">{{ r.from }} → {{ r.to }} <strong style="color:#0390B3;">¥{{ "%.2f" % r.amount }}</strong></p>
-            {% endfor %}
-            </div>
-        </details>
-        {% endfor %}
-        {% if not settlements %}
-        <div class="empty">暂无清账记录</div>
-        {% endif %}
-    </div>
-
-    <div class="card">
-        <h3>足迹地图</h3>
-        <div id="map"></div>
-        <h4 style="font-size:14px; font-weight:600; margin-top:10px;">添加足迹</h4>
-        <form action="/trip/{{ trip_id }}/add_footprint" method="post" enctype="multipart/form-data">
-            <label>记录人</label>
-            <select name="member_name" required>
-                {% for m in members %}
-                <option value="{{ m.name }}">{{ m.name }}</option>
-                {% endfor %}
-            </select>
-            <input name="city_name" placeholder="城市名，如：三亚" required>
-            <button type="button" class="outline sm" onclick="getLocation()">获取位置</button>
-            <input type="hidden" name="latitude" id="lat_input">
-            <input type="hidden" name="longitude" id="lng_input">
-            <input name="description" placeholder="一句话描述（可选）">
-            <label>照片（可选）</label>
-            <input type="file" name="photo" accept="image/*" style="padding:10px;">
-            <button type="submit">记录足迹</button>
-        </form>
-        <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">
-            {% for fp in footprints %}
-            <div style="text-align:center;">
-                {% if fp.photo_path %}
-                <img src="/static/photos/{{ fp.photo_path }}" class="photo-thumb" onclick="window.open(this.src)">
-                {% else %}
-                <div style="width:64px;height:64px;background:#f0f0f0;border-radius:10px;line-height:64px;font-size:11px;color:#ccc;">无图</div>
-                {% endif %}
-                <br><small style="color:#999;">{{ fp.city_name }}</small>
+        <div class="card">
+            <h3>今日账单 · {{ today }}</h3>
+            {% for e in today_expenses %}
+            <div class="expense-item">
+                <span>{{ e.note or '无备注' }}</span>
+                <span>{{ e.payer_name }} 付 <strong style="color:#0390B3;">¥{{ "%.2f" % e.amount }}</strong></span>
             </div>
             {% endfor %}
-        </div>
-    </div>
-
-    <div class="card">
-        <h3>旅行日志</h3>
-        <form action="/trip/{{ trip_id }}/add_log" method="post" enctype="multipart/form-data">
-            <label>作者</label>
-            <select name="member_name" required>
-                {% for m in members %}
-                <option value="{{ m.name }}">{{ m.name }}</option>
+            {% if not today_expenses %}
+            <div class="empty">今天还没有支出</div>
+            {% endif %}
+            
+            {% if today_expenses %}
+            <form action="/trip/{{ trip_id }}/daily_settle" method="post" style="margin-top:10px;">
+                <button type="submit">今日清账</button>
+            </form>
+            {% endif %}
+            
+            {% if settle_result %}
+            <div class="settle-box">
+                <p style="font-weight:600; margin-bottom:6px;">转账建议</p>
+                {% for r in settle_result %}
+                <p>{{ r.from }} → {{ r.to }} <strong style="color:#0390B3;">¥{{ "%.2f" % r.amount }}</strong></p>
                 {% endfor %}
-            </select>
-            <input name="title" placeholder="日志标题" required>
-            <textarea name="content" placeholder="记录旅途中的美好..."></textarea>
-            <label>配图（可选）</label>
-            <input type="file" name="photo" accept="image/*" style="padding:10px;">
-            <button type="submit">发布日志</button>
-        </form>
-        
-        {% for log in logs %}
-        <div class="log-item">
-            <strong>{{ log.title }}</strong>
-            <div class="log-meta">{{ log.member_name }} · {{ log.log_date }}</div>
-            <div class="log-content">{{ log.content }}</div>
-            {% if log.photo_path %}
-            <img src="/static/photos/{{ log.photo_path }}" style="max-width:100%;border-radius:10px;margin-top:6px;cursor:pointer;" onclick="window.open(this.src)">
+            </div>
+            {% endif %}
+            
+            {% if personal_summary %}
+            <div class="settle-box" style="margin-top:8px;">
+                <p style="font-weight:600; margin-bottom:6px;">今日个人花销</p>
+                {% for p in personal_summary %}
+                <p>{{ p.name }} 消费 <strong style="color:#0390B3;">¥{{ "%.2f" % p.spent }}</strong></p>
+                {% endfor %}
+            </div>
             {% endif %}
         </div>
-        {% endfor %}
+
+        <div class="card">
+            <h3>清账记录</h3>
+            {% for s in settlements %}
+            <details>
+                <summary>{{ s.settlement_date }} · ¥{{ "%.2f" % s.total_amount }}</summary>
+                <div style="padding:8px 14px;">
+                {% for r in s.parsed_result %}
+                <p style="font-size:14px; padding:2px 0;">{{ r.from }} → {{ r.to }} <strong style="color:#0390B3;">¥{{ "%.2f" % r.amount }}</strong></p>
+                {% endfor %}
+                </div>
+            </details>
+            {% endfor %}
+            {% if not settlements %}
+            <div class="empty">暂无清账记录</div>
+            {% endif %}
+        </div>
+
+        {% if personal_total %}
+        <div class="card">
+            <h3>旅途总花销</h3>
+            {% for p in personal_total %}
+            <p style="padding:4px 0; font-size:14px;">{{ p.name }} 累计消费 <strong style="color:#0390B3;">¥{{ "%.2f" % p.spent }}</strong></p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <form action="/trip/{{ trip_id }}/end" method="post" style="margin:12px 0;">
+            <button class="danger" type="submit" onclick="return confirm('确定结束旅途？记录将被保存。')">结束旅途并归档</button>
+        </form>
     </div>
 
-    {% if personal_total %}
-    <div class="card">
-        <h3>旅途总花销</h3>
-        {% for p in personal_total %}
-        <p style="padding:4px 0; font-size:14px;">{{ p.name }} 累计消费 <strong style="color:#0390B3;">¥{{ "%.2f" % p.spent }}</strong></p>
-        {% endfor %}
-    </div>
-    {% endif %}
+    <!-- 日志与足迹标签页 -->
+    <div id="tab-diary" class="tab-content">
+        <div class="card">
+            <h3>足迹地图</h3>
+            <div id="map"></div>
+            <h4 style="font-size:14px; font-weight:600; margin-top:10px;">添加足迹</h4>
+            <form action="/trip/{{ trip_id }}/add_footprint" method="post" enctype="multipart/form-data">
+                <label>记录人</label>
+                <select name="member_name" required>
+                    {% for m in members %}
+                    <option value="{{ m.name }}">{{ m.name }}</option>
+                    {% endfor %}
+                </select>
+                <input name="city_name" placeholder="城市名，如：三亚" required>
+                <button type="button" class="outline sm" onclick="getLocation()">获取位置</button>
+                <input type="hidden" name="latitude" id="lat_input">
+                <input type="hidden" name="longitude" id="lng_input">
+                <input name="description" placeholder="一句话描述（可选）">
+                <label>照片（可选）</label>
+                <input type="file" name="photo" accept="image/*" style="padding:10px;">
+                <button type="submit">记录足迹</button>
+            </form>
+            <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">
+                {% for fp in footprints %}
+                <div style="text-align:center;">
+                    {% if fp.photo_path %}
+                    <img src="/static/photos/{{ fp.photo_path }}" class="photo-thumb" onclick="window.open(this.src)">
+                    {% else %}
+                    <div style="width:64px;height:64px;background:#f0f0f0;border-radius:10px;line-height:64px;font-size:11px;color:#ccc;">无图</div>
+                    {% endif %}
+                    <br><small style="color:#999;">{{ fp.city_name }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
 
-    <form action="/trip/{{ trip_id }}/end" method="post" style="margin:12px 0;">
-        <button class="danger" type="submit" onclick="return confirm('确定结束旅途？记录将被保存。')">结束旅途并归档</button>
-    </form>
+        <div class="card">
+            <h3>旅行日志</h3>
+            <form action="/trip/{{ trip_id }}/add_log" method="post" enctype="multipart/form-data">
+                <label>作者</label>
+                <select name="member_name" required>
+                    {% for m in members %}
+                    <option value="{{ m.name }}">{{ m.name }}</option>
+                    {% endfor %}
+                </select>
+                <input name="title" placeholder="日志标题" required>
+                <textarea name="content" placeholder="记录旅途中的美好..."></textarea>
+                <label>配图（可选）</label>
+                <input type="file" name="photo" accept="image/*" style="padding:10px;">
+                <button type="submit">发布日志</button>
+            </form>
+            
+            {% for log in logs %}
+            <div class="log-item">
+                <strong>{{ log.title }}</strong>
+                <div class="log-meta">{{ log.member_name }} · {{ log.log_date }}</div>
+                <div class="log-content">{{ log.content }}</div>
+                {% if log.photo_path %}
+                <img src="/static/photos/{{ log.photo_path }}" style="max-width:100%;border-radius:10px;margin-top:6px;cursor:pointer;" onclick="window.open(this.src)">
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 
     <script>
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+            document.getElementById('tab-' + tab).classList.add('active');
+            if (tab === 'diary') {
+                setTimeout(function() { map.invalidateSize(); }, 100);
+            }
+            document.querySelectorAll('.tab').forEach(function(t, i) {
+                if ((tab === 'accounting' && i === 0) || (tab === 'diary' && i === 1)) {
+                    t.classList.add('active');
+                }
+            });
+        }
+        
         var map = L.map('map').setView([35, 105], 4);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: '&copy; OpenStreetMap'}).addTo(map);
         
