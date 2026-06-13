@@ -26,6 +26,10 @@ def today_beijing():
     tz = timezone(timedelta(hours=8))
     return datetime.now(tz).strftime('%Y-%m-%d')
 
+def now_beijing():
+    tz = timezone(timedelta(hours=8))
+    return datetime.now(tz).strftime('%Y-%m-%d %H:%M')
+
 # ---------- 数据库初始化 ----------
 def init_db():
     conn = get_db()
@@ -33,6 +37,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS trips (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             trip_name TEXT NOT NULL,
+            password TEXT NOT NULL DEFAULT '',
             start_date TEXT NOT NULL,
             end_date TEXT NOT NULL,
             status TEXT DEFAULT 'active'
@@ -115,11 +120,8 @@ HOME_HTML = '''<!DOCTYPE html>
         .trip-item strong { font-size: 15px; }
         .trip-item span { font-size: 12px; color: #999; }
         .hidden-form { display: none; margin-top: 10px; padding: 16px; background: #fafafa; border-radius: 12px; }
-        .tag { display: inline-block; background: #e8f4f8; color: #0390B3; padding: 6px 14px; border-radius: 20px; margin: 3px; font-size: 13px; font-weight: 500; cursor: pointer; }
-        .tag:hover { background: #d0ecf5; }
-        .recent-title { font-size: 13px; color: #999; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
-        .clear-link { font-size: 12px; color: #ccc; cursor: pointer; }
         .empty { color: #bbb; font-size: 14px; text-align: center; padding: 16px 0; }
+        .error-msg { color: #e74c3c; font-size: 13px; margin-top: 4px; display: none; }
     </style>
 </head>
 <body>
@@ -132,6 +134,7 @@ HOME_HTML = '''<!DOCTYPE html>
         <h3>新建旅途</h3>
         <form action="/create_trip" method="post" id="createForm">
             <input name="trip_name" placeholder="旅途名称，如：三亚之旅" required>
+            <input name="password" type="text" placeholder="设置访问密码" required>
             <label>开始日期</label>
             <input name="start_date" type="date" required>
             <label>结束日期</label>
@@ -141,82 +144,50 @@ HOME_HTML = '''<!DOCTYPE html>
     </div>
 
     <div class="card">
-        <h3>进行中的旅途</h3>
-        {% set has_active = namespace(value=false) %}
-        {% for t in trips %}
-            {% if t.status == 'active' %}
-            {% set has_active.value = true %}
-            <div class="trip-item">
-                <div>
-                    <strong>{{ t.trip_name }}</strong><br>
-                    <span>{{ t.start_date }} — {{ t.end_date }}</span>
-                </div>
-                <a href="/trip/{{ t.id }}"><button class="sm">进入 →</button></a>
-            </div>
-            {% endif %}
-        {% endfor %}
-        {% if not has_active.value %}
-        <div class="empty">暂无进行中的旅途</div>
-        {% endif %}
+        <h3>加入旅途</h3>
+        <form action="/join_trip" method="post" id="joinForm">
+            <input name="trip_name" placeholder="旅途名称" required>
+            <input name="password" type="text" placeholder="访问密码" required>
+            <button type="submit" class="outline">加入旅途</button>
+        </form>
+        <div class="error-msg" id="joinError"></div>
     </div>
 
-    <div class="card">
-        <h3>已归档的旅途</h3>
-        {% set has_archived = namespace(value=false) %}
-        {% for t in trips %}
-            {% if t.status == 'archived' %}
-            {% set has_archived.value = true %}
-            <div class="trip-item">
-                <div>
-                    <strong>{{ t.trip_name }}</strong><br>
-                    <span>{{ t.start_date }} — {{ t.end_date }}</span>
-                </div>
-                <a href="/trip/{{ t.id }}"><button class="sm outline">查看 →</button></a>
-            </div>
-            {% endif %}
-        {% endfor %}
-        {% if not has_archived.value %}
-        <div class="empty">暂无已归档的旅途</div>
-        {% endif %}
-    </div>
-
-    <div id="recentTrips" style="margin-top:12px;"></div>
+    <div id="myTrips"></div>
 
     <script>
-        var recentKey = 'travel_recent_trips';
+        var storageKey = 'travel_my_trips';
         
-        function loadRecentTrips() {
-            var raw = localStorage.getItem(recentKey);
+        function loadMyTrips() {
+            var raw = localStorage.getItem(storageKey);
             if (!raw) return;
             var trips = JSON.parse(raw);
             if (!trips || trips.length === 0) return;
-            var container = document.getElementById('recentTrips');
-            if (!container) return;
-            var html = '<div class="card"><h3>最近访问的旅途</h3>';
-            html += '<div class="recent-title"><span></span><span class="clear-link" onclick="clearRecent()">清除</span></div>';
-            html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+            var container = document.getElementById('myTrips');
+            var html = '<div class="card"><h3>我的旅途</h3>';
             trips.forEach(function(t) {
-                html += '<span class="tag" onclick="location.href=\'/trip/' + t.id + '\'">' + t.name + '</span>';
+                var statusTag = t.status === 'archived' ? ' <span style="font-size:11px;color:#999;">[已归档]</span>' : '';
+                html += '<div class="trip-item"><div><strong>' + t.name + '</strong>' + statusTag + '<br><span>' + t.start + ' — ' + t.end + '</span></div><a href="/trip/' + t.id + '"><button class="sm">进入 →</button></a></div>';
             });
-            html += '</div></div>';
+            html += '<button class="sm outline" onclick="clearMyTrips()">清除记录</button></div>';
             container.innerHTML = html;
         }
         
-        function saveTrip(id, name) {
-            if (!id || !name) return;
-            var trips = JSON.parse(localStorage.getItem(recentKey) || '[]');
+        function saveTrip(id, name, start, end, status) {
+            var trips = JSON.parse(localStorage.getItem(storageKey) || '[]');
             trips = trips.filter(function(t) { return t.id !== id; });
-            trips.unshift({id: id, name: name});
-            if (trips.length > 5) trips = trips.slice(0, 5);
-            localStorage.setItem(recentKey, JSON.stringify(trips));
+            trips.unshift({id: id, name: name, start: start, end: end, status: status});
+            if (trips.length > 10) trips = trips.slice(0, 10);
+            localStorage.setItem(storageKey, JSON.stringify(trips));
+            loadMyTrips();
         }
         
-        function clearRecent() {
-            localStorage.removeItem(recentKey);
-            document.getElementById('recentTrips').innerHTML = '';
+        function clearMyTrips() {
+            localStorage.removeItem(storageKey);
+            document.getElementById('myTrips').innerHTML = '';
         }
         
-        loadRecentTrips();
+        loadMyTrips();
     </script>
 </body>
 </html>'''
@@ -238,7 +209,7 @@ TRIP_HTML = '''<!DOCTYPE html>
         .header a { color: #0390B3; text-decoration: none; font-size: 14px; font-weight: 500; }
         .header h2 { font-size: 18px; font-weight: 700; }
         .tabs { display: flex; gap: 0; margin-bottom: 14px; background: #fff; border-radius: 12px; padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-        .tab { flex: 1; text-align: center; padding: 10px 0; font-size: 14px; font-weight: 600; color: #999; cursor: pointer; border-radius: 10px; transition: all 0.2s; }
+        .tab { flex: 1; text-align: center; padding: 10px 0; font-size: 13px; font-weight: 600; color: #999; cursor: pointer; border-radius: 10px; transition: all 0.2s; }
         .tab.active { background: #0390B3; color: #fff; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -490,19 +461,22 @@ TRIP_HTML = '''<!DOCTYPE html>
 
     <script>
         var identityKey = 'travel_identity_{{ trip_id }}';
-        var recentKey = 'travel_recent_trips';
+        var storageKey = 'travel_my_trips';
         var tripId = {{ trip_id }};
         var tripName = "{{ trip_name }}";
+        var tripStart = "{{ trip_start }}";
+        var tripEnd = "{{ trip_end }}";
+        var tripStatus = "{{ trip_status }}";
         
-        // 记忆旅途
+        // 记忆旅途到本地
         try {
-            var raw = localStorage.getItem(recentKey);
+            var raw = localStorage.getItem(storageKey);
             var trips = raw ? JSON.parse(raw) : [];
             if (!Array.isArray(trips)) trips = [];
             trips = trips.filter(function(t) { return t.id !== tripId; });
-            trips.unshift({id: tripId, name: tripName});
-            if (trips.length > 5) trips = trips.slice(0, 5);
-            localStorage.setItem(recentKey, JSON.stringify(trips));
+            trips.unshift({id: tripId, name: tripName, start: tripStart, end: tripEnd, status: tripStatus});
+            if (trips.length > 10) trips = trips.slice(0, 10);
+            localStorage.setItem(storageKey, JSON.stringify(trips));
         } catch(e) {}
         
         function switchTab(tab) {
@@ -577,25 +551,36 @@ TRIP_HTML = '''<!DOCTYPE html>
 # ---------- 路由 ----------
 @app.route('/')
 def index():
-    conn = get_db()
-    trips = conn.execute('SELECT * FROM trips ORDER BY start_date DESC').fetchall()
-    conn.close()
-    return render_template_string(HOME_HTML, trips=trips)
+    return render_template_string(HOME_HTML)
 
 @app.route('/create_trip', methods=['POST'])
 def create_trip():
     trip_name = request.form.get('trip_name', '').strip()
+    password = request.form.get('password', '').strip()
     start_date = request.form.get('start_date', '')
     end_date = request.form.get('end_date', '')
-    if not trip_name or not start_date or not end_date:
+    if not trip_name or not start_date or not end_date or not password:
         return "请填写完整信息", 400
     conn = get_db()
-    conn.execute('INSERT INTO trips (trip_name, start_date, end_date) VALUES (?,?,?)',
-                 (trip_name, start_date, end_date))
+    conn.execute('INSERT INTO trips (trip_name, password, start_date, end_date) VALUES (?,?,?,?)',
+                 (trip_name, password, start_date, end_date))
     conn.commit()
     trip_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
     conn.close()
     return redirect(url_for('trip_page', trip_id=trip_id))
+
+@app.route('/join_trip', methods=['POST'])
+def join_trip():
+    trip_name = request.form.get('trip_name', '').strip()
+    password = request.form.get('password', '').strip()
+    if not trip_name or not password:
+        return "请填写完整信息", 400
+    conn = get_db()
+    trip = conn.execute('SELECT * FROM trips WHERE trip_name=? AND password=?', (trip_name, password)).fetchone()
+    conn.close()
+    if not trip:
+        return render_template_string('''<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>错误</title><style>body{font-family:-apple-system,sans-serif;max-width:500px;margin:50px auto;text-align:center;}.card{background:#fff;padding:30px;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}a{color:#0390B3;}</style></head><body><div class="card"><h2>密码错误或旅途不存在</h2><p><a href="/">返回首页</a></p></div></body></html>''')
+    return redirect(url_for('trip_page', trip_id=trip['id']))
 
 @app.route('/trip/<int:trip_id>')
 def trip_page(trip_id):
@@ -616,7 +601,7 @@ def trip_page(trip_id):
     personal_total = [{'name': s['member_name'], 'spent': round(s['total_spent'], 2)} for s in all_shares]
     conn.close()
     fp_json = [{'city_name':f['city_name'],'latitude':f['latitude'],'longitude':f['longitude'],'photo_path':f['photo_path'],'description':f['description'],'member_name':f['member_name']} for f in footprints]
-    return render_template_string(TRIP_HTML, trip_id=trip_id, trip_name=trip['trip_name'], members=members, today=today, today_expenses=today_expenses, settlements=settlements, settle_result=None, personal_summary=None, personal_total=personal_total, footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False), logs=logs, is_archived=is_archived)
+    return render_template_string(TRIP_HTML, trip_id=trip_id, trip_name=trip['trip_name'], trip_start=trip['start_date'], trip_end=trip['end_date'], trip_status=trip['status'], members=members, today=today, today_expenses=today_expenses, settlements=settlements, settle_result=None, personal_summary=None, personal_total=personal_total, footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False), logs=logs, is_archived=is_archived)
 
 @app.route('/trip/<int:trip_id>/add_member', methods=['POST'])
 def add_member(trip_id):
@@ -641,7 +626,7 @@ def add_expense(trip_id):
     if not payer or amount <= 0 or not sharers: return "请填写完整信息", 400
     conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
-    if trip['status'] == 'archived': conn.close(); return "已归档的旅途不能添加支出", 400
+    if trip['status'] == 'archived': conn.close(); return "已归档", 400
     today = today_beijing()
     conn.execute('INSERT INTO expenses (trip_id, payer_name, amount, note, expense_date) VALUES (?,?,?,?,?)', (trip_id, payer, amount, note, today))
     expense_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
@@ -657,17 +642,16 @@ def daily_settle(trip_id):
     today = today_beijing()
     conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
-    if trip['status'] == 'archived': conn.close(); return "已归档的旅途不能清账", 400
+    if trip['status'] == 'archived': conn.close(); return "已归档", 400
     expenses = conn.execute('SELECT * FROM expenses WHERE trip_id=? AND expense_date=? AND settlement_id IS NULL', (trip_id, today)).fetchall()
     if not expenses: conn.close(); return redirect(url_for('trip_page', trip_id=trip_id))
-    paid = defaultdict(float)
-    owed = defaultdict(float)
+    paid = defaultdict(float); owed = defaultdict(float)
     for e in expenses:
         paid[e['payer_name']] += e['amount']
         for s in conn.execute('SELECT * FROM expense_shares WHERE expense_id=?', (e['id'],)).fetchall():
             owed[s['member_name']] += s['share']
     all_names = set(list(paid.keys()) + list(owed.keys()))
-    net = {n: round(paid.get(n,0) - owed.get(n,0), 2) for n in all_names}
+    net = {n: round(paid.get(n,0)-owed.get(n,0),2) for n in all_names}
     creditors = [(n, net[n]) for n in net if net[n] > 0.01]
     debtors = [(n, -net[n]) for n in net if net[n] < -0.01]
     result = []
@@ -698,7 +682,7 @@ def daily_settle(trip_id):
     personal_total = [{'name': s['member_name'], 'spent': round(s['total_spent'], 2)} for s in all_shares]
     conn.close()
     fp_json = [{'city_name':f['city_name'],'latitude':f['latitude'],'longitude':f['longitude'],'photo_path':f['photo_path'],'description':f['description'],'member_name':f['member_name']} for f in footprints]
-    return render_template_string(TRIP_HTML, trip_id=trip_id, trip_name=trip['trip_name'], members=members, today=today, today_expenses=[], settlements=settlements, settle_result=result, personal_summary=personal_summary, personal_total=personal_total, footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False), logs=logs, is_archived=False)
+    return render_template_string(TRIP_HTML, trip_id=trip_id, trip_name=trip['trip_name'], trip_start=trip['start_date'], trip_end=trip['end_date'], trip_status=trip['status'], members=members, today=today, today_expenses=[], settlements=settlements, settle_result=result, personal_summary=personal_summary, personal_total=personal_total, footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False), logs=logs, is_archived=False)
 
 @app.route('/trip/<int:trip_id>/add_footprint', methods=['POST'])
 def add_footprint(trip_id):
@@ -709,8 +693,7 @@ def add_footprint(trip_id):
     desc = request.form.get('description', '')
     if not city_name: return "请输入城市名", 400
     conn = get_db()
-    trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
-    if trip['status'] == 'archived': conn.close(); return "已归档的旅途不能添加足迹", 400
+    if conn.execute('SELECT status FROM trips WHERE id=?', (trip_id,)).fetchone()['status'] == 'archived': conn.close(); return "已归档", 400
     latitude = float(lat) if lat else None
     longitude = float(lng) if lng else None
     photo_path = None
@@ -730,10 +713,9 @@ def add_log(trip_id):
     member_name = request.form.get('member_name', '')
     title = request.form.get('title', '').strip()
     content = request.form.get('content', '')
-    if not title: return "请输入标题", 400
+    if not title or not member_name: return "请填写完整信息", 400
     conn = get_db()
-    trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
-    if trip['status'] == 'archived': conn.close(); return "已归档的旅途不能添加日志", 400
+    if conn.execute('SELECT status FROM trips WHERE id=?', (trip_id,)).fetchone()['status'] == 'archived': conn.close(); return "已归档", 400
     photo_path = None
     if 'photo' in request.files:
         file = request.files['photo']
@@ -741,7 +723,7 @@ def add_log(trip_id):
             filename = uuid.uuid4().hex + '_' + secure_filename(file.filename)
             file.save(os.path.join(UPLOAD_FOLDER, filename))
             photo_path = filename
-    conn.execute('INSERT INTO travel_logs (trip_id, member_name, title, content, photo_path, log_date) VALUES (?,?,?,?,?,?)', (trip_id, member_name, title, content, photo_path, today_beijing()))
+    conn.execute('INSERT INTO travel_logs (trip_id, member_name, title, content, photo_path, log_date) VALUES (?,?,?,?,?,?)', (trip_id, member_name, title, content, photo_path, now_beijing()))
     conn.commit()
     conn.close()
     return redirect(url_for('trip_page', trip_id=trip_id))
