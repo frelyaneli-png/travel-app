@@ -225,6 +225,7 @@ TEAM_HTML = '''<!DOCTYPE html>
     </style>
 </head>
 <body>
+    <span id="teamNameData" style="display:none;">{{ team_name }}</span>
     <div class="header">
         <a href="/">← 首页</a>
         <h2>👥 {{ team_name }}</h2>
@@ -304,18 +305,22 @@ TEAM_HTML = '''<!DOCTYPE html>
         <div class="empty">暂无已归档的旅途</div>
         {% endif %}
     </div>
-       <script>
+    <script>
         (function() {
             var teamKey = 'travel_recent_teams';
             var identityKey = 'travel_identity_' + '{{ team_id }}';
-            var teamName = document.querySelector('.header h2').textContent.replace('👥 ', '').trim();
+            
+            var nameEl = document.getElementById('teamNameData');
+            var teamName = nameEl ? nameEl.textContent.trim() : '';
             
             if (teamName) {
-                var teams = JSON.parse(localStorage.getItem(teamKey) || '[]');
-                teams = teams.filter(function(t) { return t !== teamName; });
-                teams.unshift(teamName);
-                if (teams.length > 5) teams = teams.slice(0, 5);
-                localStorage.setItem(teamKey, JSON.stringify(teams));
+                try {
+                    var teams = JSON.parse(localStorage.getItem(teamKey) || '[]');
+                    teams = teams.filter(function(t) { return t !== teamName; });
+                    teams.unshift(teamName);
+                    if (teams.length > 5) teams = teams.slice(0, 5);
+                    localStorage.setItem(teamKey, JSON.stringify(teams));
+                } catch(e) {}
             }
             
             var select = document.getElementById('identitySelect');
