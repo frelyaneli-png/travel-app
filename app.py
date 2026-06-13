@@ -713,7 +713,8 @@ def add_log(trip_id):
     member_name = request.form.get('member_name', '')
     title = request.form.get('title', '').strip()
     content = request.form.get('content', '')
-    if not title or not member_name: return "请填写完整信息", 400
+    if not title: return "请输入标题", 400
+    if not member_name: return "请选择作者", 400
     conn = get_db()
     if conn.execute('SELECT status FROM trips WHERE id=?', (trip_id,)).fetchone()['status'] == 'archived': conn.close(); return "已归档", 400
     photo_path = None
@@ -727,7 +728,7 @@ def add_log(trip_id):
     conn.commit()
     conn.close()
     return redirect(url_for('trip_page', trip_id=trip_id))
-
+    
 @app.route('/trip/<int:trip_id>/end', methods=['POST'])
 def end_trip(trip_id):
     conn = get_db()
