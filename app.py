@@ -126,6 +126,8 @@ HOME_HTML = '''<!DOCTYPE html>
         button:hover { background: #027a99; }
         button.outline { background: #fff; color: #0390B3; border: 1.5px solid #0390B3; }
         button.outline:hover { background: #f0f9fb; }
+        .tag { display: inline-block; background: #e8f4f8; color: #0390B3; padding: 6px 14px; border-radius: 20px; margin: 3px; font-size: 13px; font-weight: 500; cursor: pointer; }
+        .tag:hover { background: #d0ecf5; }
     </style>
 </head>
 <body>
@@ -143,11 +145,43 @@ HOME_HTML = '''<!DOCTYPE html>
     </div>
     <div class="card">
         <h3>加入已有团队</h3>
-        <form action="/join" method="post">
-            <input name="team" placeholder="输入已有团队名称" required>
+        <form action="/join" method="post" id="joinForm">
+            <input name="team" id="teamInput" placeholder="输入已有团队名称" required>
             <button type="submit" class="outline">加入团队</button>
         </form>
+        <div id="recentTeams" style="margin-top:12px; display:none;">
+            <p style="font-size:13px; color:#999; margin-bottom:6px;">最近加入的团队</p>
+            <div id="recentList" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+        </div>
     </div>
+    <script>
+        function saveTeam(name) {
+            var teams = JSON.parse(localStorage.getItem('recentTeams') || '[]');
+            teams = teams.filter(function(t) { return t !== name; });
+            teams.unshift(name);
+            if (teams.length > 5) teams = teams.slice(0, 5);
+            localStorage.setItem('recentTeams', JSON.stringify(teams));
+        }
+        function loadRecentTeams() {
+            var teams = JSON.parse(localStorage.getItem('recentTeams') || '[]');
+            if (teams.length === 0) return;
+            document.getElementById('recentTeams').style.display = 'block';
+            var html = '';
+            teams.forEach(function(t) {
+                html += '<span class="tag" onclick="joinTeam(\'' + t + '\')">' + t + '</span>';
+            });
+            document.getElementById('recentList').innerHTML = html;
+        }
+        function joinTeam(name) {
+            document.getElementById('teamInput').value = name;
+            document.getElementById('joinForm').submit();
+        }
+        document.getElementById('joinForm').addEventListener('submit', function() {
+            var name = document.getElementById('teamInput').value.trim();
+            if (name) saveTeam(name);
+        });
+        loadRecentTeams();
+    </script>
 </body>
 </html>'''
 
@@ -201,20 +235,23 @@ TEAM_HTML = '''<!DOCTYPE html>
     </div>
 
     <div class="card">
-        <h3>旅途列表</h3>
+        <h3>进行中的旅途</h3>
+        {% set has_active = False %}
         {% for t in trips %}
-        <div class="trip-item">
-            <div>
-                <strong>{{ t.trip_name }}</strong><br>
-                <span>{{ t.start_date }} — {{ t.end_date }}</span>
-            </div>
             {% if t.status == 'active' %}
-            <a href="/trip/{{ t.id }}"><button class="sm">进入 →</button></a>
-            {% else %}
-            <span style="font-size:12px; color:#bbb;">已归档</span>
+            {% set has_active = True %}
+            <div class="trip-item">
+                <div>
+                    <strong>{{ t.trip_name }}</strong><br>
+                    <span>{{ t.start_date }} — {{ t.end_date }}</span>
+                </div>
+                <a href="/trip/{{ t.id }}"><button class="sm">进入 →</button></a>
+            </div>
             {% endif %}
-        </div>
         {% endfor %}
+        {% if not has_active %}
+        <div class="empty">暂无进行中的旅途</div>
+        {% endif %}
         
         <button class="outline sm" onclick="document.getElementById('tripForm').style.display='block'" style="margin-top:8px;">+ 新建旅途</button>
         <div id="tripForm" class="hidden-form">
@@ -228,6 +265,37 @@ TEAM_HTML = '''<!DOCTYPE html>
             </form>
         </div>
     </div>
+
+    <div class="card">
+        <h3>已归档的旅途</h3>
+        {% for t in trips %}
+            {% if t.status == 'archived' %}
+            <div class="trip-item">
+                <div>
+                    <strong>{{ t.trip_name }}</strong><br>
+                    <span>{{ t.start_date }} — {{ t.end_date }}</span>
+                </div>
+                <a href="/trip/{{ t.id }}"><button class="sm outline">查看 →</button></a>
+            </div>
+            {% endif %}
+        {% endfor %}
+        {% set has_archived = False %}
+        {% for t in trips %}
+            {% if t.status == 'archived' %}{% set has_archived = True %}{% endif %}
+        {% endfor %}
+        {% if not has_archived %}
+        <div class="empty">暂无已归档的旅途</div>
+        {% endif %}
+    </div>
+
+    <script>
+        var teamName = "{{ team_name }}";
+        var teams = JSON.parse(localStorage.getItem('recentTeams') || '[]');
+        teams = teams.filter(function(t) { return t !== teamName; });
+        teams.unshift(teamName);
+        if (teams.length > 5) teams = teams.slice(0, 5);
+        localStorage.setItem('recentTeams', JSON.stringify(teams));
+    </script>
 </body>
 </html>'''
 
@@ -280,12 +348,13 @@ TRIP_HTML = '''<!DOCTYPE html>
         .checkbox-row label { font-weight: 400; font-size: 14px; width: auto; margin: 0; display: flex; align-items: center; gap: 4px; cursor: pointer; }
         .checkbox-row input[type=checkbox] { width: auto; margin: 0; }
         a { color: #0390B3; text-decoration: none; }
+        .archived-badge { display: inline-block; background: #f0f0f0; color: #999; padding: 3px 10px; border-radius: 10px; font-size: 12px; margin-left: 8px; }
     </style>
 </head>
 <body>
     <div class="header">
         <a href="/team/{{ team_id }}">← 团队</a>
-        <h2>🌴 {{ trip_name }}</h2>
+        <h2>🌴 {{ trip_name }}{% if is_archived %} <span class="archived-badge">已归档</span>{% endif %}</h2>
     </div>
 
     <div class="tabs">
@@ -295,6 +364,7 @@ TRIP_HTML = '''<!DOCTYPE html>
 
     <!-- 记账标签页 -->
     <div id="tab-accounting" class="tab-content active">
+        {% if not is_archived %}
         <div class="card">
             <h3>记录垫付</h3>
             <form action="/trip/{{ trip_id }}/add_expense" method="post">
@@ -356,6 +426,7 @@ TRIP_HTML = '''<!DOCTYPE html>
             </div>
             {% endif %}
         </div>
+        {% endif %}
 
         <div class="card">
             <h3>清账记录</h3>
@@ -383,9 +454,11 @@ TRIP_HTML = '''<!DOCTYPE html>
         </div>
         {% endif %}
 
+        {% if not is_archived %}
         <form action="/trip/{{ trip_id }}/end" method="post" style="margin:12px 0;">
             <button class="danger" type="submit" onclick="return confirm('确定结束旅途？记录将被保存。')">结束旅途并归档</button>
         </form>
+        {% endif %}
     </div>
 
     <!-- 日志与足迹标签页 -->
@@ -393,6 +466,7 @@ TRIP_HTML = '''<!DOCTYPE html>
         <div class="card">
             <h3>足迹地图</h3>
             <div id="map"></div>
+            {% if not is_archived %}
             <h4 style="font-size:14px; font-weight:600; margin-top:10px;">添加足迹</h4>
             <form action="/trip/{{ trip_id }}/add_footprint" method="post" enctype="multipart/form-data">
                 <label>记录人</label>
@@ -410,6 +484,7 @@ TRIP_HTML = '''<!DOCTYPE html>
                 <input type="file" name="photo" accept="image/*" style="padding:10px;">
                 <button type="submit">记录足迹</button>
             </form>
+            {% endif %}
             <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">
                 {% for fp in footprints %}
                 <div style="text-align:center;">
@@ -426,6 +501,7 @@ TRIP_HTML = '''<!DOCTYPE html>
 
         <div class="card">
             <h3>旅行日志</h3>
+            {% if not is_archived %}
             <form action="/trip/{{ trip_id }}/add_log" method="post" enctype="multipart/form-data">
                 <label>作者</label>
                 <select name="member_name" required>
@@ -439,6 +515,7 @@ TRIP_HTML = '''<!DOCTYPE html>
                 <input type="file" name="photo" accept="image/*" style="padding:10px;">
                 <button type="submit">发布日志</button>
             </form>
+            {% endif %}
             
             {% for log in logs %}
             <div class="log-item">
@@ -458,14 +535,12 @@ TRIP_HTML = '''<!DOCTYPE html>
             document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
             document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
             document.getElementById('tab-' + tab).classList.add('active');
-            if (tab === 'diary') {
-                setTimeout(function() { map.invalidateSize(); }, 100);
-            }
             document.querySelectorAll('.tab').forEach(function(t, i) {
                 if ((tab === 'accounting' && i === 0) || (tab === 'diary' && i === 1)) {
                     t.classList.add('active');
                 }
             });
+            if (tab === 'diary') { setTimeout(function() { map.invalidateSize(); }, 100); }
         }
         
         var map = L.map('map').setView([35, 105], 4);
@@ -579,6 +654,7 @@ def trip_page(trip_id):
         return "旅途不存在", 404
     
     team_id = trip['team_id']
+    is_archived = trip['status'] == 'archived'
     members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
     today = today_beijing()
     
@@ -600,7 +676,6 @@ def trip_page(trip_id):
     footprints = conn.execute('SELECT * FROM footprints WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
     logs = conn.execute('SELECT * FROM travel_logs WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
     
-    # 计算每个人旅途累计花销（分摊金额）
     all_shares = conn.execute('''
         SELECT es.member_name, SUM(es.share) as total_spent
         FROM expense_shares es
@@ -629,7 +704,7 @@ def trip_page(trip_id):
         settlements=settlements, settle_result=None,
         personal_summary=None, personal_total=personal_total,
         footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False),
-        logs=logs)
+        logs=logs, is_archived=is_archived)
 
 @app.route('/trip/<int:trip_id>/add_expense', methods=['POST'])
 def add_expense(trip_id):
@@ -643,6 +718,9 @@ def add_expense(trip_id):
     
     conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
+    if trip['status'] == 'archived':
+        conn.close()
+        return "已归档的旅途不能添加支出", 400
     team_id = trip['team_id']
     today = today_beijing()
     
@@ -662,6 +740,11 @@ def add_expense(trip_id):
 def daily_settle(trip_id):
     today = today_beijing()
     conn = get_db()
+    
+    trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
+    if trip['status'] == 'archived':
+        conn.close()
+        return "已归档的旅途不能清账", 400
     
     expenses = conn.execute('''
         SELECT * FROM expenses 
@@ -707,7 +790,6 @@ def daily_settle(trip_id):
     for e in expenses:
         conn.execute('UPDATE expenses SET settlement_id=? WHERE id=?', (settle_id, e['id']))
     
-    # 计算每个人今天各自花销（分摊金额）
     personal_today = defaultdict(float)
     for e in expenses:
         shares = conn.execute('SELECT * FROM expense_shares WHERE expense_id=?', (e['id'],)).fetchall()
@@ -717,7 +799,6 @@ def daily_settle(trip_id):
     
     conn.commit()
     
-    trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     team_id = trip['team_id']
     members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
     today_expenses = []
@@ -726,7 +807,6 @@ def daily_settle(trip_id):
     footprints = conn.execute('SELECT * FROM footprints WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
     logs = conn.execute('SELECT * FROM travel_logs WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
     
-    # 旅途累计花销
     all_shares = conn.execute('''
         SELECT es.member_name, SUM(es.share) as total_spent
         FROM expense_shares es
@@ -746,7 +826,7 @@ def daily_settle(trip_id):
         settlements=settlements, settle_result=result,
         personal_summary=personal_summary, personal_total=personal_total,
         footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False),
-        logs=logs)
+        logs=logs, is_archived=False)
 
 @app.route('/trip/<int:trip_id>/add_footprint', methods=['POST'])
 def add_footprint(trip_id):
@@ -759,6 +839,12 @@ def add_footprint(trip_id):
     if not city_name:
         return "请输入城市名", 400
     
+    conn = get_db()
+    trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
+    if trip['status'] == 'archived':
+        conn.close()
+        return "已归档的旅途不能添加足迹", 400
+    
     latitude = float(lat) if lat else None
     longitude = float(lng) if lng else None
     
@@ -770,7 +856,6 @@ def add_footprint(trip_id):
             file.save(os.path.join(UPLOAD_FOLDER, filename))
             photo_path = filename
     
-    conn = get_db()
     conn.execute('INSERT INTO footprints (trip_id, member_name, city_name, latitude, longitude, photo_path, description) VALUES (?,?,?,?,?,?,?)',
                  (trip_id, member_name, city_name, latitude, longitude, photo_path, desc))
     conn.commit()
@@ -786,6 +871,12 @@ def add_log(trip_id):
     if not title:
         return "请输入标题", 400
     
+    conn = get_db()
+    trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
+    if trip['status'] == 'archived':
+        conn.close()
+        return "已归档的旅途不能添加日志", 400
+    
     photo_path = None
     if 'photo' in request.files:
         file = request.files['photo']
@@ -794,7 +885,6 @@ def add_log(trip_id):
             file.save(os.path.join(UPLOAD_FOLDER, filename))
             photo_path = filename
     
-    conn = get_db()
     conn.execute('INSERT INTO travel_logs (trip_id, member_name, title, content, photo_path, log_date) VALUES (?,?,?,?,?,?)',
                  (trip_id, member_name, title, content, photo_path, today_beijing()))
     conn.commit()
