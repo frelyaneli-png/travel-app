@@ -144,42 +144,53 @@ HOME_HTML = '''<!DOCTYPE html>
         <div id="recentTeams" style="margin-top:12px;"></div>
     </div>
     <script>
-        var recentKey = 'travel_recent_teams';
-        function saveTeam(name) {
-            var teams = JSON.parse(localStorage.getItem(recentKey) || '[]');
-            teams = teams.filter(function(t) { return t !== name; });
-            teams.unshift(name);
-            if (teams.length > 5) teams = teams.slice(0, 5);
-            localStorage.setItem(recentKey, JSON.stringify(teams));
-        }
-        function loadRecentTeams() {
-            var teams = JSON.parse(localStorage.getItem(recentKey) || '[]');
-            if (teams.length === 0) return;
-            var container = document.getElementById('recentTeams');
-            var html = '<div class="recent-title"><span>最近加入的团队</span><span class="clear-link" onclick="clearRecent()">清除</span></div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
-            teams.forEach(function(t) {
-                html += '<span class="tag" onclick="joinTeam(\'' + t.replace(/'/g, "\\'") + '\')">' + t + '</span>';
-            });
-            html += '</div>';
-            container.innerHTML = html;
-        }
-        function joinTeam(name) {
-            document.getElementById('teamInput').value = name;
-            document.getElementById('joinForm').submit();
-        }
-        function clearRecent() {
-            localStorage.removeItem(recentKey);
-            document.getElementById('recentTeams').innerHTML = '';
-        }
-        document.getElementById('joinForm').addEventListener('submit', function() {
-            var name = document.getElementById('teamInput').value.trim();
-            if (name) saveTeam(name);
-        });
-        loadRecentTeams();
+        (function() {
+            var recentKey = 'travel_recent_teams';
+            
+            function saveTeam(name) {
+                if (!name) return;
+                var teams = JSON.parse(localStorage.getItem(recentKey) || '[]');
+                teams = teams.filter(function(t) { return t !== name; });
+                teams.unshift(name);
+                if (teams.length > 5) teams = teams.slice(0, 5);
+                localStorage.setItem(recentKey, JSON.stringify(teams));
+            }
+            
+            function loadRecentTeams() {
+                var teams = JSON.parse(localStorage.getItem(recentKey) || '[]');
+                var container = document.getElementById('recentTeams');
+                if (!container || teams.length === 0) return;
+                var html = '<div class="recent-title"><span>最近加入的团队</span><span class="clear-link" onclick="clearRecent()">清除</span></div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
+                teams.forEach(function(t) {
+                    html += '<span class="tag" onclick="joinTeam(\'' + t.replace(/'/g, "\\'") + '\')">' + t + '</span>';
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
+            
+            window.joinTeam = function(name) {
+                document.getElementById('teamInput').value = name;
+                document.getElementById('joinForm').submit();
+            };
+            
+            window.clearRecent = function() {
+                localStorage.removeItem(recentKey);
+                document.getElementById('recentTeams').innerHTML = '';
+            };
+            
+            var form = document.getElementById('joinForm');
+            if (form) {
+                form.addEventListener('submit', function() {
+                    var name = document.getElementById('teamInput').value.trim();
+                    if (name) saveTeam(name);
+                });
+            }
+            
+            loadRecentTeams();
+        })();
     </script>
 </body>
 </html>'''
-
 TEAM_HTML = '''<!DOCTYPE html>
 <html>
 <head>
