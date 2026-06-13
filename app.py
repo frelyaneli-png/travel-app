@@ -30,28 +30,22 @@ def today_beijing():
 def init_db():
     conn = get_db()
     conn.executescript('''
-        CREATE TABLE IF NOT EXISTS teams (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS members (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            team_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            UNIQUE(team_id, name)
-        );
         CREATE TABLE IF NOT EXISTS trips (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            team_id INTEGER NOT NULL,
             trip_name TEXT NOT NULL,
             start_date TEXT NOT NULL,
             end_date TEXT NOT NULL,
             status TEXT DEFAULT 'active'
         );
+        CREATE TABLE IF NOT EXISTS members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trip_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            UNIQUE(trip_id, name)
+        );
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             trip_id INTEGER NOT NULL,
-            team_id INTEGER NOT NULL,
             payer_name TEXT NOT NULL,
             amount REAL NOT NULL,
             note TEXT,
@@ -106,150 +100,44 @@ HOME_HTML = '''<!DOCTYPE html>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif; max-width: 500px; margin: 0 auto; padding: 24px 16px; background: #f8f9fa; color: #1a1a1a; }
-        .logo { text-align: center; padding: 28px 0 8px; }
+        .logo { text-align: center; padding: 28px 0 16px; }
         .logo .icon { font-size: 44px; }
         .logo h1 { font-size: 22px; font-weight: 700; margin-top: 6px; color: #1a1a1a; }
-        .logo p { font-size: 13px; color: #999; margin-top: 2px; }
         .card { background: #fff; padding: 20px; margin: 12px 0; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
         .card h3 { font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 12px; }
         input, button { width: 100%; padding: 12px 14px; margin: 5px 0; border: 1.5px solid #e8e8e8; border-radius: 10px; font-size: 15px; background: #fafafa; color: #1a1a1a; }
         input:focus { outline: none; border-color: #0390B3; background: #fff; }
         button { background: #0390B3; color: #fff; border: none; font-weight: 600; cursor: pointer; }
         button.outline { background: #fff; color: #0390B3; border: 1.5px solid #0390B3; }
+        button.sm { width: auto; padding: 8px 16px; font-size: 14px; }
+        label { display: block; margin-top: 6px; font-size: 13px; font-weight: 600; color: #666; }
+        .trip-item { padding: 14px; margin: 6px 0; background: #fafafa; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .trip-item strong { font-size: 15px; }
+        .trip-item span { font-size: 12px; color: #999; }
+        .hidden-form { display: none; margin-top: 10px; padding: 16px; background: #fafafa; border-radius: 12px; }
         .tag { display: inline-block; background: #e8f4f8; color: #0390B3; padding: 6px 14px; border-radius: 20px; margin: 3px; font-size: 13px; font-weight: 500; cursor: pointer; }
         .tag:hover { background: #d0ecf5; }
         .recent-title { font-size: 13px; color: #999; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
         .clear-link { font-size: 12px; color: #ccc; cursor: pointer; }
+        .empty { color: #bbb; font-size: 14px; text-align: center; padding: 16px 0; }
     </style>
 </head>
 <body>
     <div class="logo">
         <div class="icon">🧳</div>
         <h1>旅行记账</h1>
-        <p>多人联机 · 实时同步</p>
-    </div>
-    <div class="card">
-        <h3>创建新团队</h3>
-        <form action="/create" method="post">
-            <input name="team" placeholder="输入团队名称" required>
-            <button type="submit">创建团队</button>
-        </form>
-    </div>
-    <div class="card">
-        <h3>加入已有团队</h3>
-        <form action="/join" method="post" id="joinForm">
-            <input name="team" id="teamInput" placeholder="输入已有团队名称" required>
-            <button type="submit" class="outline">加入团队</button>
-        </form>
-        <div id="recentTeams" style="margin-top:12px;"></div>
-    </div>
-    <script>
-        var recentKey = 'travel_recent_teams';
-        
-        function loadRecentTeams() {
-            var raw = localStorage.getItem(recentKey);
-            if (!raw) return;
-            var teams = JSON.parse(raw);
-            if (!teams || teams.length === 0) return;
-            var container = document.getElementById('recentTeams');
-            if (!container) return;
-            var html = '<div class="recent-title"><span>最近加入的团队</span><span class="clear-link" onclick="clearRecent()">清除</span></div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
-            teams.forEach(function(t) {
-                html += '<span class="tag" onclick="joinTeam(\'' + t.replace(/'/g, "\\'") + '\')">' + t + '</span>';
-            });
-            html += '</div>';
-            container.innerHTML = html;
-        }
-        
-        function saveTeam(name) {
-            if (!name) return;
-            var teams = JSON.parse(localStorage.getItem(recentKey) || '[]');
-            teams = teams.filter(function(t) { return t !== name; });
-            teams.unshift(name);
-            if (teams.length > 5) teams = teams.slice(0, 5);
-            localStorage.setItem(recentKey, JSON.stringify(teams));
-        }
-        
-        function joinTeam(name) {
-            document.getElementById('teamInput').value = name;
-            document.getElementById('joinForm').submit();
-        }
-        
-        function clearRecent() {
-            localStorage.removeItem(recentKey);
-            document.getElementById('recentTeams').innerHTML = '';
-        }
-        
-        document.getElementById('joinForm').addEventListener('submit', function() {
-            var name = document.getElementById('teamInput').value.trim();
-            if (name) saveTeam(name);
-        });
-        
-        loadRecentTeams();
-    </script>
-</body>
-</html>'''
-
-TEAM_HTML = '''<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#0390B3">
-    <title>{{ team_name }} - 旅行记账</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif; max-width: 500px; margin: 0 auto; padding: 20px 16px; background: #f8f9fa; color: #1a1a1a; }
-        .header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-        .header a { color: #0390B3; text-decoration: none; font-size: 14px; font-weight: 500; }
-        .header h2 { font-size: 18px; font-weight: 700; }
-        .card { background: #fff; padding: 18px; margin: 10px 0; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-        .card h3 { font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 10px; }
-        input, select, button { width: 100%; padding: 11px 14px; margin: 5px 0; border: 1.5px solid #e8e8e8; border-radius: 10px; font-size: 15px; background: #fafafa; color: #1a1a1a; }
-        input:focus, select:focus { outline: none; border-color: #0390B3; background: #fff; }
-        button { background: #0390B3; color: #fff; border: none; font-weight: 600; cursor: pointer; }
-        button.sm { width: auto; padding: 8px 16px; font-size: 14px; }
-        button.outline { background: #fff; color: #0390B3; border: 1.5px solid #0390B3; }
-        label { display: block; margin-top: 6px; font-size: 13px; font-weight: 600; color: #666; }
-        .tag { display: inline-block; background: #e8f4f8; color: #0390B3; padding: 5px 14px; border-radius: 20px; margin: 3px; font-size: 13px; font-weight: 500; }
-        .trip-item { padding: 14px; margin: 6px 0; background: #fafafa; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .trip-item strong { font-size: 15px; }
-        .trip-item span { font-size: 12px; color: #999; }
-        .hidden-form { display: none; margin-top: 10px; padding: 16px; background: #fafafa; border-radius: 12px; }
-        a { color: #0390B3; text-decoration: none; }
-        .identity-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #e8f4f8; border-radius: 10px; margin-bottom: 12px; font-size: 14px; }
-        .identity-bar select { width: auto; padding: 6px 10px; margin: 0; font-size: 14px; }
-        .identity-bar span { font-weight: 600; color: #0390B3; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <a href="/">← 首页</a>
-        <h2>👥 {{ team_name }}</h2>
-    </div>
-
-    <div class="identity-bar">
-        <span>当前身份：</span>
-        <select id="identitySelect" onchange="setIdentity()">
-            <option value="">未选择</option>
-            {% for m in members %}
-            <option value="{{ m.name }}">{{ m.name }}</option>
-            {% endfor %}
-        </select>
     </div>
 
     <div class="card">
-        <h3>成员管理</h3>
-        <form action="/team/{{ team_id }}/add_member" method="post" style="display:flex; gap:8px;">
-            <input name="name" placeholder="新成员姓名" required style="flex:1;">
-            <button type="submit" class="sm" style="margin:5px 0;">添加</button>
+        <h3>新建旅途</h3>
+        <form action="/create_trip" method="post" id="createForm">
+            <input name="trip_name" placeholder="旅途名称，如：三亚之旅" required>
+            <label>开始日期</label>
+            <input name="start_date" type="date" required>
+            <label>结束日期</label>
+            <input name="end_date" type="date" required>
+            <button type="submit">创建旅途</button>
         </form>
-        <p style="margin-top:10px;">
-            {% for m in members %}
-            <span class="tag">{{ m.name }}</span>
-            {% endfor %}
-        </p>
     </div>
 
     <div class="card">
@@ -270,18 +158,6 @@ TEAM_HTML = '''<!DOCTYPE html>
         {% if not has_active.value %}
         <div class="empty">暂无进行中的旅途</div>
         {% endif %}
-        
-        <button class="outline sm" onclick="document.getElementById('tripForm').style.display='block'" style="margin-top:8px;">+ 新建旅途</button>
-        <div id="tripForm" class="hidden-form">
-            <form action="/team/{{ team_id }}/create_trip" method="post">
-                <input name="trip_name" placeholder="旅途名称" required>
-                <label>开始日期</label>
-                <input name="start_date" type="date" required>
-                <label>结束日期</label>
-                <input name="end_date" type="date" required>
-                <button type="submit">创建旅途</button>
-            </form>
-        </div>
     </div>
 
     <div class="card">
@@ -304,32 +180,43 @@ TEAM_HTML = '''<!DOCTYPE html>
         {% endif %}
     </div>
 
+    <div id="recentTrips" style="margin-top:12px;"></div>
+
     <script>
-        var identityKey = 'travel_identity_{{ team_id }}';
-        var teamKey = 'travel_recent_teams';
-        var teamName = "{{ team_name }}";
+        var recentKey = 'travel_recent_trips';
         
-        // 记忆团队
-        try {
-            var raw = localStorage.getItem(teamKey);
-            var teams = raw ? JSON.parse(raw) : [];
-            if (!Array.isArray(teams)) teams = [];
-            teams = teams.filter(function(t) { return t !== teamName; });
-            teams.unshift(teamName);
-            if (teams.length > 5) teams = teams.slice(0, 5);
-            localStorage.setItem(teamKey, JSON.stringify(teams));
-        } catch(e) {}
+        function loadRecentTrips() {
+            var raw = localStorage.getItem(recentKey);
+            if (!raw) return;
+            var trips = JSON.parse(raw);
+            if (!trips || trips.length === 0) return;
+            var container = document.getElementById('recentTrips');
+            if (!container) return;
+            var html = '<div class="card"><h3>最近访问的旅途</h3>';
+            html += '<div class="recent-title"><span></span><span class="clear-link" onclick="clearRecent()">清除</span></div>';
+            html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+            trips.forEach(function(t) {
+                html += '<span class="tag" onclick="location.href=\'/trip/' + t.id + '\'">' + t.name + '</span>';
+            });
+            html += '</div></div>';
+            container.innerHTML = html;
+        }
         
-        // 身份选择
-        function setIdentity() {
-            var val = document.getElementById('identitySelect').value;
-            localStorage.setItem(identityKey, val);
+        function saveTrip(id, name) {
+            if (!id || !name) return;
+            var trips = JSON.parse(localStorage.getItem(recentKey) || '[]');
+            trips = trips.filter(function(t) { return t.id !== id; });
+            trips.unshift({id: id, name: name});
+            if (trips.length > 5) trips = trips.slice(0, 5);
+            localStorage.setItem(recentKey, JSON.stringify(trips));
         }
-        var saved = localStorage.getItem(identityKey);
-        if (saved) {
-            var sel = document.getElementById('identitySelect');
-            if (sel) sel.value = saved;
+        
+        function clearRecent() {
+            localStorage.removeItem(recentKey);
+            document.getElementById('recentTrips').innerHTML = '';
         }
+        
+        loadRecentTrips();
     </script>
 </body>
 </html>'''
@@ -387,11 +274,12 @@ TRIP_HTML = '''<!DOCTYPE html>
         .identity-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #e8f4f8; border-radius: 10px; margin-bottom: 12px; font-size: 14px; }
         .identity-bar select { width: auto; padding: 6px 10px; margin: 0; font-size: 14px; }
         .identity-bar span { font-weight: 600; color: #0390B3; }
+        .tag { display: inline-block; background: #e8f4f8; color: #0390B3; padding: 5px 14px; border-radius: 20px; margin: 3px; font-size: 13px; font-weight: 500; }
     </style>
 </head>
 <body>
     <div class="header">
-        <a href="/team/{{ team_id }}">← 团队</a>
+        <a href="/">← 首页</a>
         <h2>🌴 {{ trip_name }}{% if is_archived %} <span class="archived-badge">已归档</span>{% endif %}</h2>
     </div>
 
@@ -407,6 +295,7 @@ TRIP_HTML = '''<!DOCTYPE html>
 
     <div class="tabs">
         <div class="tab active" onclick="switchTab('accounting')">记账</div>
+        <div class="tab" onclick="switchTab('members')">成员</div>
         <div class="tab" onclick="switchTab('diary')">日志与足迹</div>
     </div>
 
@@ -509,6 +398,27 @@ TRIP_HTML = '''<!DOCTYPE html>
         {% endif %}
     </div>
 
+    <!-- 成员标签页 -->
+    <div id="tab-members" class="tab-content">
+        <div class="card">
+            <h3>成员管理</h3>
+            {% if not is_archived %}
+            <form action="/trip/{{ trip_id }}/add_member" method="post" style="display:flex; gap:8px;">
+                <input name="name" placeholder="新成员姓名" required style="flex:1;">
+                <button type="submit" class="sm" style="margin:5px 0;">添加</button>
+            </form>
+            {% endif %}
+            <p style="margin-top:10px;">
+                {% for m in members %}
+                <span class="tag">{{ m.name }}</span>
+                {% endfor %}
+            </p>
+            {% if not members %}
+            <div class="empty">暂无成员，请先添加</div>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- 日志与足迹标签页 -->
     <div id="tab-diary" class="tab-content">
         <div class="card">
@@ -579,14 +489,28 @@ TRIP_HTML = '''<!DOCTYPE html>
     </div>
 
     <script>
-        var identityKey = 'travel_identity_{{ team_id }}';
+        var identityKey = 'travel_identity_{{ trip_id }}';
+        var recentKey = 'travel_recent_trips';
+        var tripId = {{ trip_id }};
+        var tripName = "{{ trip_name }}";
+        
+        // 记忆旅途
+        try {
+            var raw = localStorage.getItem(recentKey);
+            var trips = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(trips)) trips = [];
+            trips = trips.filter(function(t) { return t.id !== tripId; });
+            trips.unshift({id: tripId, name: tripName});
+            if (trips.length > 5) trips = trips.slice(0, 5);
+            localStorage.setItem(recentKey, JSON.stringify(trips));
+        } catch(e) {}
         
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
             document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
             document.getElementById('tab-' + tab).classList.add('active');
             document.querySelectorAll('.tab').forEach(function(t, i) {
-                if ((tab === 'accounting' && i === 0) || (tab === 'diary' && i === 1)) t.classList.add('active');
+                if ((tab === 'accounting' && i === 0) || (tab === 'members' && i === 1) || (tab === 'diary' && i === 2)) t.classList.add('active');
             });
             if (tab === 'diary') { setTimeout(function() { map.invalidateSize(); }, 100); }
         }
@@ -653,73 +577,21 @@ TRIP_HTML = '''<!DOCTYPE html>
 # ---------- 路由 ----------
 @app.route('/')
 def index():
-    return render_template_string(HOME_HTML)
-
-@app.route('/create', methods=['POST'])
-def create():
-    team = request.form.get('team', '').strip()
-    if not team:
-        return "团队名不能为空", 400
     conn = get_db()
-    try:
-        conn.execute('INSERT INTO teams (name) VALUES (?)', (team,))
-        conn.commit()
-        tid = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()['id']
-    except:
-        conn.close()
-        return "团队名已存在，请换一个", 400
+    trips = conn.execute('SELECT * FROM trips ORDER BY start_date DESC').fetchall()
     conn.close()
-    return redirect(url_for('team_page', team_id=tid))
+    return render_template_string(HOME_HTML, trips=trips)
 
-@app.route('/join', methods=['POST'])
-def join():
-    team = request.form.get('team', '').strip()
-    if not team:
-        return "请输入团队名称", 400
-    conn = get_db()
-    row = conn.execute('SELECT id FROM teams WHERE name=?', (team,)).fetchone()
-    conn.close()
-    if not row:
-        return "团队不存在，请先创建", 404
-    return redirect(url_for('team_page', team_id=row['id']))
-
-@app.route('/team/<int:team_id>')
-def team_page(team_id):
-    conn = get_db()
-    team = conn.execute('SELECT * FROM teams WHERE id=?', (team_id,)).fetchone()
-    if not team:
-        conn.close()
-        return "团队不存在", 404
-    members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
-    trips = conn.execute('SELECT * FROM trips WHERE team_id=? ORDER BY start_date DESC', (team_id,)).fetchall()
-    conn.close()
-    return render_template_string(TEAM_HTML, team_id=team_id, team_name=team['name'], members=members, trips=trips)
-
-@app.route('/team/<int:team_id>/add_member', methods=['POST'])
-def add_member(team_id):
-    name = request.form.get('name', '').strip()
-    if not name:
-        return "名字不能为空", 400
-    conn = get_db()
-    try:
-        conn.execute('INSERT INTO members (team_id, name) VALUES (?,?)', (team_id, name))
-        conn.commit()
-    except:
-        conn.close()
-        return "该成员已存在", 400
-    conn.close()
-    return redirect(url_for('team_page', team_id=team_id))
-
-@app.route('/team/<int:team_id>/create_trip', methods=['POST'])
-def create_trip(team_id):
+@app.route('/create_trip', methods=['POST'])
+def create_trip():
     trip_name = request.form.get('trip_name', '').strip()
     start_date = request.form.get('start_date', '')
     end_date = request.form.get('end_date', '')
     if not trip_name or not start_date or not end_date:
         return "请填写完整信息", 400
     conn = get_db()
-    conn.execute('INSERT INTO trips (team_id, trip_name, start_date, end_date) VALUES (?,?,?,?)',
-                 (team_id, trip_name, start_date, end_date))
+    conn.execute('INSERT INTO trips (trip_name, start_date, end_date) VALUES (?,?,?)',
+                 (trip_name, start_date, end_date))
     conn.commit()
     trip_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
     conn.close()
@@ -732,9 +604,8 @@ def trip_page(trip_id):
     if not trip:
         conn.close()
         return "旅途不存在", 404
-    team_id = trip['team_id']
     is_archived = trip['status'] == 'archived'
-    members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
+    members = conn.execute('SELECT * FROM members WHERE trip_id=?', (trip_id,)).fetchall()
     today = today_beijing()
     today_expenses = conn.execute('SELECT * FROM expenses WHERE trip_id=? AND expense_date=? AND settlement_id IS NULL ORDER BY rowid DESC', (trip_id, today)).fetchall()
     settlements_raw = conn.execute('SELECT * FROM daily_settlements WHERE trip_id=? ORDER BY settlement_date DESC', (trip_id,)).fetchall()
@@ -745,7 +616,21 @@ def trip_page(trip_id):
     personal_total = [{'name': s['member_name'], 'spent': round(s['total_spent'], 2)} for s in all_shares]
     conn.close()
     fp_json = [{'city_name':f['city_name'],'latitude':f['latitude'],'longitude':f['longitude'],'photo_path':f['photo_path'],'description':f['description'],'member_name':f['member_name']} for f in footprints]
-    return render_template_string(TRIP_HTML, trip_id=trip_id, trip_name=trip['trip_name'], team_id=team_id, members=members, today=today, today_expenses=today_expenses, settlements=settlements, settle_result=None, personal_summary=None, personal_total=personal_total, footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False), logs=logs, is_archived=is_archived)
+    return render_template_string(TRIP_HTML, trip_id=trip_id, trip_name=trip['trip_name'], members=members, today=today, today_expenses=today_expenses, settlements=settlements, settle_result=None, personal_summary=None, personal_total=personal_total, footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False), logs=logs, is_archived=is_archived)
+
+@app.route('/trip/<int:trip_id>/add_member', methods=['POST'])
+def add_member(trip_id):
+    name = request.form.get('name', '').strip()
+    if not name: return "名字不能为空", 400
+    conn = get_db()
+    try:
+        conn.execute('INSERT INTO members (trip_id, name) VALUES (?,?)', (trip_id, name))
+        conn.commit()
+    except:
+        conn.close()
+        return "该成员已存在", 400
+    conn.close()
+    return redirect(url_for('trip_page', trip_id=trip_id))
 
 @app.route('/trip/<int:trip_id>/add_expense', methods=['POST'])
 def add_expense(trip_id):
@@ -753,16 +638,12 @@ def add_expense(trip_id):
     amount = float(request.form.get('amount', 0))
     note = request.form.get('note', '')
     sharers = request.form.getlist('sharers')
-    if not payer or amount <= 0 or not sharers:
-        return "请填写完整信息", 400
+    if not payer or amount <= 0 or not sharers: return "请填写完整信息", 400
     conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
-    if trip['status'] == 'archived':
-        conn.close()
-        return "已归档的旅途不能添加支出", 400
-    team_id = trip['team_id']
+    if trip['status'] == 'archived': conn.close(); return "已归档的旅途不能添加支出", 400
     today = today_beijing()
-    conn.execute('INSERT INTO expenses (trip_id, team_id, payer_name, amount, note, expense_date) VALUES (?,?,?,?,?,?)', (trip_id, team_id, payer, amount, note, today))
+    conn.execute('INSERT INTO expenses (trip_id, payer_name, amount, note, expense_date) VALUES (?,?,?,?,?)', (trip_id, payer, amount, note, today))
     expense_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
     share = round(amount / len(sharers), 2)
     for s in sharers:
@@ -776,13 +657,9 @@ def daily_settle(trip_id):
     today = today_beijing()
     conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
-    if trip['status'] == 'archived':
-        conn.close()
-        return "已归档的旅途不能清账", 400
+    if trip['status'] == 'archived': conn.close(); return "已归档的旅途不能清账", 400
     expenses = conn.execute('SELECT * FROM expenses WHERE trip_id=? AND expense_date=? AND settlement_id IS NULL', (trip_id, today)).fetchall()
-    if not expenses:
-        conn.close()
-        return redirect(url_for('trip_page', trip_id=trip_id))
+    if not expenses: conn.close(); return redirect(url_for('trip_page', trip_id=trip_id))
     paid = defaultdict(float)
     owed = defaultdict(float)
     for e in expenses:
@@ -805,16 +682,14 @@ def daily_settle(trip_id):
     total = sum(e['amount'] for e in expenses)
     conn.execute('INSERT INTO daily_settlements (trip_id, settlement_date, total_amount, result_json) VALUES (?,?,?,?)', (trip_id, today, total, json.dumps(result, ensure_ascii=False)))
     settle_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
-    for e in expenses:
-        conn.execute('UPDATE expenses SET settlement_id=? WHERE id=?', (settle_id, e['id']))
+    for e in expenses: conn.execute('UPDATE expenses SET settlement_id=? WHERE id=?', (settle_id, e['id']))
     personal_today = defaultdict(float)
     for e in expenses:
         for s in conn.execute('SELECT * FROM expense_shares WHERE expense_id=?', (e['id'],)).fetchall():
             personal_today[s['member_name']] += s['share']
     personal_summary = [{'name': n, 'spent': round(a, 2)} for n, a in personal_today.items()]
     conn.commit()
-    team_id = trip['team_id']
-    members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
+    members = conn.execute('SELECT * FROM members WHERE trip_id=?', (trip_id,)).fetchall()
     settlements_raw = conn.execute('SELECT * FROM daily_settlements WHERE trip_id=? ORDER BY settlement_date DESC', (trip_id,)).fetchall()
     settlements = [{'settlement_date': s['settlement_date'], 'total_amount': s['total_amount'], 'parsed_result': json.loads(s['result_json'])} for s in settlements_raw]
     footprints = conn.execute('SELECT * FROM footprints WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
@@ -823,7 +698,7 @@ def daily_settle(trip_id):
     personal_total = [{'name': s['member_name'], 'spent': round(s['total_spent'], 2)} for s in all_shares]
     conn.close()
     fp_json = [{'city_name':f['city_name'],'latitude':f['latitude'],'longitude':f['longitude'],'photo_path':f['photo_path'],'description':f['description'],'member_name':f['member_name']} for f in footprints]
-    return render_template_string(TRIP_HTML, trip_id=trip_id, trip_name=trip['trip_name'], team_id=team_id, members=members, today=today, today_expenses=[], settlements=settlements, settle_result=result, personal_summary=personal_summary, personal_total=personal_total, footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False), logs=logs, is_archived=False)
+    return render_template_string(TRIP_HTML, trip_id=trip_id, trip_name=trip['trip_name'], members=members, today=today, today_expenses=[], settlements=settlements, settle_result=result, personal_summary=personal_summary, personal_total=personal_total, footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False), logs=logs, is_archived=False)
 
 @app.route('/trip/<int:trip_id>/add_footprint', methods=['POST'])
 def add_footprint(trip_id):
@@ -835,9 +710,7 @@ def add_footprint(trip_id):
     if not city_name: return "请输入城市名", 400
     conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
-    if trip['status'] == 'archived':
-        conn.close()
-        return "已归档的旅途不能添加足迹", 400
+    if trip['status'] == 'archived': conn.close(); return "已归档的旅途不能添加足迹", 400
     latitude = float(lat) if lat else None
     longitude = float(lng) if lng else None
     photo_path = None
@@ -860,9 +733,7 @@ def add_log(trip_id):
     if not title: return "请输入标题", 400
     conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
-    if trip['status'] == 'archived':
-        conn.close()
-        return "已归档的旅途不能添加日志", 400
+    if trip['status'] == 'archived': conn.close(); return "已归档的旅途不能添加日志", 400
     photo_path = None
     if 'photo' in request.files:
         file = request.files['photo']
@@ -881,7 +752,7 @@ def end_trip(trip_id):
     conn.execute("UPDATE trips SET status='archived' WHERE id=?", (trip_id,))
     conn.commit()
     conn.close()
-    return redirect(url_for('team_page', team_id=request.args.get('team_id', 1)))
+    return redirect(url_for('index'))
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
