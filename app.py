@@ -23,7 +23,6 @@ def get_db():
     return conn
 
 def today_beijing():
-    """返回北京时间今天的日期字符串"""
     tz = timezone(timedelta(hours=8))
     return datetime.now(tz).strftime('%Y-%m-%d')
 
@@ -35,14 +34,12 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL
         );
-        
         CREATE TABLE IF NOT EXISTS members (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             team_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             UNIQUE(team_id, name)
         );
-        
         CREATE TABLE IF NOT EXISTS trips (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             team_id INTEGER NOT NULL,
@@ -51,7 +48,6 @@ def init_db():
             end_date TEXT NOT NULL,
             status TEXT DEFAULT 'active'
         );
-        
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             trip_id INTEGER NOT NULL,
@@ -62,14 +58,12 @@ def init_db():
             expense_date TEXT NOT NULL,
             settlement_id INTEGER DEFAULT NULL
         );
-        
         CREATE TABLE IF NOT EXISTS expense_shares (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             expense_id INTEGER NOT NULL,
             member_name TEXT NOT NULL,
             share REAL NOT NULL
         );
-        
         CREATE TABLE IF NOT EXISTS daily_settlements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             trip_id INTEGER NOT NULL,
@@ -77,7 +71,6 @@ def init_db():
             total_amount REAL NOT NULL,
             result_json TEXT NOT NULL
         );
-        
         CREATE TABLE IF NOT EXISTS footprints (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             trip_id INTEGER NOT NULL,
@@ -88,7 +81,6 @@ def init_db():
             photo_path TEXT,
             description TEXT
         );
-        
         CREATE TABLE IF NOT EXISTS travel_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             trip_id INTEGER NOT NULL,
@@ -122,12 +114,12 @@ HOME_HTML = '''<!DOCTYPE html>
         .card h3 { font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 12px; }
         input, button { width: 100%; padding: 12px 14px; margin: 5px 0; border: 1.5px solid #e8e8e8; border-radius: 10px; font-size: 15px; background: #fafafa; color: #1a1a1a; }
         input:focus { outline: none; border-color: #0390B3; background: #fff; }
-        button { background: #0390B3; color: #fff; border: none; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-        button:hover { background: #027a99; }
+        button { background: #0390B3; color: #fff; border: none; font-weight: 600; cursor: pointer; }
         button.outline { background: #fff; color: #0390B3; border: 1.5px solid #0390B3; }
-        button.outline:hover { background: #f0f9fb; }
         .tag { display: inline-block; background: #e8f4f8; color: #0390B3; padding: 6px 14px; border-radius: 20px; margin: 3px; font-size: 13px; font-weight: 500; cursor: pointer; }
         .tag:hover { background: #d0ecf5; }
+        .recent-title { font-size: 13px; color: #999; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .clear-link { font-size: 12px; color: #ccc; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -149,32 +141,35 @@ HOME_HTML = '''<!DOCTYPE html>
             <input name="team" id="teamInput" placeholder="输入已有团队名称" required>
             <button type="submit" class="outline">加入团队</button>
         </form>
-        <div id="recentTeams" style="margin-top:12px; display:none;">
-            <p style="font-size:13px; color:#999; margin-bottom:6px;">最近加入的团队</p>
-            <div id="recentList" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
-        </div>
+        <div id="recentTeams" style="margin-top:12px;"></div>
     </div>
     <script>
+        var recentKey = 'travel_recent_teams';
         function saveTeam(name) {
-            var teams = JSON.parse(localStorage.getItem('recentTeams') || '[]');
+            var teams = JSON.parse(localStorage.getItem(recentKey) || '[]');
             teams = teams.filter(function(t) { return t !== name; });
             teams.unshift(name);
             if (teams.length > 5) teams = teams.slice(0, 5);
-            localStorage.setItem('recentTeams', JSON.stringify(teams));
+            localStorage.setItem(recentKey, JSON.stringify(teams));
         }
         function loadRecentTeams() {
-            var teams = JSON.parse(localStorage.getItem('recentTeams') || '[]');
+            var teams = JSON.parse(localStorage.getItem(recentKey) || '[]');
             if (teams.length === 0) return;
-            document.getElementById('recentTeams').style.display = 'block';
-            var html = '';
+            var container = document.getElementById('recentTeams');
+            var html = '<div class="recent-title"><span>最近加入的团队</span><span class="clear-link" onclick="clearRecent()">清除</span></div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
             teams.forEach(function(t) {
-                html += '<span class="tag" onclick="joinTeam(\'' + t + '\')">' + t + '</span>';
+                html += '<span class="tag" onclick="joinTeam(\'' + t.replace(/'/g, "\\'") + '\')">' + t + '</span>';
             });
-            document.getElementById('recentList').innerHTML = html;
+            html += '</div>';
+            container.innerHTML = html;
         }
         function joinTeam(name) {
             document.getElementById('teamInput').value = name;
             document.getElementById('joinForm').submit();
+        }
+        function clearRecent() {
+            localStorage.removeItem(recentKey);
+            document.getElementById('recentTeams').innerHTML = '';
         }
         document.getElementById('joinForm').addEventListener('submit', function() {
             var name = document.getElementById('teamInput').value.trim();
@@ -213,12 +208,25 @@ TEAM_HTML = '''<!DOCTYPE html>
         .trip-item span { font-size: 12px; color: #999; }
         .hidden-form { display: none; margin-top: 10px; padding: 16px; background: #fafafa; border-radius: 12px; }
         a { color: #0390B3; text-decoration: none; }
+        .identity-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #e8f4f8; border-radius: 10px; margin-bottom: 12px; font-size: 14px; }
+        .identity-bar select { width: auto; padding: 6px 10px; margin: 0; font-size: 14px; }
+        .identity-bar span { font-weight: 600; color: #0390B3; }
     </style>
 </head>
 <body>
     <div class="header">
         <a href="/">← 首页</a>
         <h2>👥 {{ team_name }}</h2>
+    </div>
+
+    <div class="identity-bar">
+        <span>当前身份：</span>
+        <select id="identitySelect" onchange="setIdentity()">
+            <option value="">未选择</option>
+            {% for m in members %}
+            <option value="{{ m.name }}">{{ m.name }}</option>
+            {% endfor %}
+        </select>
     </div>
 
     <div class="card">
@@ -236,10 +244,10 @@ TEAM_HTML = '''<!DOCTYPE html>
 
     <div class="card">
         <h3>进行中的旅途</h3>
-        {% set has_active = False %}
+        {% set has_active = namespace(value=false) %}
         {% for t in trips %}
             {% if t.status == 'active' %}
-            {% set has_active = True %}
+            {% set has_active.value = true %}
             <div class="trip-item">
                 <div>
                     <strong>{{ t.trip_name }}</strong><br>
@@ -249,7 +257,7 @@ TEAM_HTML = '''<!DOCTYPE html>
             </div>
             {% endif %}
         {% endfor %}
-        {% if not has_active %}
+        {% if not has_active.value %}
         <div class="empty">暂无进行中的旅途</div>
         {% endif %}
         
@@ -268,8 +276,10 @@ TEAM_HTML = '''<!DOCTYPE html>
 
     <div class="card">
         <h3>已归档的旅途</h3>
+        {% set has_archived = namespace(value=false) %}
         {% for t in trips %}
             {% if t.status == 'archived' %}
+            {% set has_archived.value = true %}
             <div class="trip-item">
                 <div>
                     <strong>{{ t.trip_name }}</strong><br>
@@ -279,22 +289,33 @@ TEAM_HTML = '''<!DOCTYPE html>
             </div>
             {% endif %}
         {% endfor %}
-        {% set has_archived = False %}
-        {% for t in trips %}
-            {% if t.status == 'archived' %}{% set has_archived = True %}{% endif %}
-        {% endfor %}
-        {% if not has_archived %}
+        {% if not has_archived.value %}
         <div class="empty">暂无已归档的旅途</div>
         {% endif %}
     </div>
 
     <script>
+        var identityKey = 'travel_identity_{{ team_id }}';
+        var teamKey = 'travel_recent_teams';
         var teamName = "{{ team_name }}";
-        var teams = JSON.parse(localStorage.getItem('recentTeams') || '[]');
+        
+        // 记忆团队
+        var teams = JSON.parse(localStorage.getItem(teamKey) || '[]');
         teams = teams.filter(function(t) { return t !== teamName; });
         teams.unshift(teamName);
         if (teams.length > 5) teams = teams.slice(0, 5);
-        localStorage.setItem('recentTeams', JSON.stringify(teams));
+        localStorage.setItem(teamKey, JSON.stringify(teams));
+        
+        // 身份选择
+        function setIdentity() {
+            var val = document.getElementById('identitySelect').value;
+            localStorage.setItem(identityKey, val);
+        }
+        // 恢复上次选择的身份
+        var saved = localStorage.getItem(identityKey);
+        if (saved) {
+            document.getElementById('identitySelect').value = saved;
+        }
     </script>
 </body>
 </html>'''
@@ -349,12 +370,25 @@ TRIP_HTML = '''<!DOCTYPE html>
         .checkbox-row input[type=checkbox] { width: auto; margin: 0; }
         a { color: #0390B3; text-decoration: none; }
         .archived-badge { display: inline-block; background: #f0f0f0; color: #999; padding: 3px 10px; border-radius: 10px; font-size: 12px; margin-left: 8px; }
+        .identity-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #e8f4f8; border-radius: 10px; margin-bottom: 12px; font-size: 14px; }
+        .identity-bar select { width: auto; padding: 6px 10px; margin: 0; font-size: 14px; }
+        .identity-bar span { font-weight: 600; color: #0390B3; }
     </style>
 </head>
 <body>
     <div class="header">
         <a href="/team/{{ team_id }}">← 团队</a>
         <h2>🌴 {{ trip_name }}{% if is_archived %} <span class="archived-badge">已归档</span>{% endif %}</h2>
+    </div>
+
+    <div class="identity-bar">
+        <span>当前身份：</span>
+        <select id="identitySelect" onchange="setIdentity()">
+            <option value="">未选择</option>
+            {% for m in members %}
+            <option value="{{ m.name }}">{{ m.name }}</option>
+            {% endfor %}
+        </select>
     </div>
 
     <div class="tabs">
@@ -369,7 +403,7 @@ TRIP_HTML = '''<!DOCTYPE html>
             <h3>记录垫付</h3>
             <form action="/trip/{{ trip_id }}/add_expense" method="post">
                 <label>付款人</label>
-                <select name="payer" required>
+                <select name="payer" id="payerSelect" required>
                     {% for m in members %}
                     <option value="{{ m.name }}">{{ m.name }}</option>
                     {% endfor %}
@@ -470,7 +504,7 @@ TRIP_HTML = '''<!DOCTYPE html>
             <h4 style="font-size:14px; font-weight:600; margin-top:10px;">添加足迹</h4>
             <form action="/trip/{{ trip_id }}/add_footprint" method="post" enctype="multipart/form-data">
                 <label>记录人</label>
-                <select name="member_name" required>
+                <select name="member_name" id="footprintMember" required>
                     {% for m in members %}
                     <option value="{{ m.name }}">{{ m.name }}</option>
                     {% endfor %}
@@ -504,7 +538,7 @@ TRIP_HTML = '''<!DOCTYPE html>
             {% if not is_archived %}
             <form action="/trip/{{ trip_id }}/add_log" method="post" enctype="multipart/form-data">
                 <label>作者</label>
-                <select name="member_name" required>
+                <select name="member_name" id="logAuthor" required>
                     {% for m in members %}
                     <option value="{{ m.name }}">{{ m.name }}</option>
                     {% endfor %}
@@ -531,16 +565,50 @@ TRIP_HTML = '''<!DOCTYPE html>
     </div>
 
     <script>
+        var identityKey = 'travel_identity_{{ team_id }}';
+        
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
             document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
             document.getElementById('tab-' + tab).classList.add('active');
             document.querySelectorAll('.tab').forEach(function(t, i) {
-                if ((tab === 'accounting' && i === 0) || (tab === 'diary' && i === 1)) {
-                    t.classList.add('active');
-                }
+                if ((tab === 'accounting' && i === 0) || (tab === 'diary' && i === 1)) t.classList.add('active');
             });
             if (tab === 'diary') { setTimeout(function() { map.invalidateSize(); }, 100); }
+        }
+        
+        function setIdentity() {
+            var val = document.getElementById('identitySelect').value;
+            localStorage.setItem(identityKey, val);
+            // 同步到付款人、日志作者（日志强制自己）
+            if (val) {
+                var payer = document.getElementById('payerSelect');
+                if (payer) payer.value = val;
+                var logAuthor = document.getElementById('logAuthor');
+                if (logAuthor) {
+                    logAuthor.value = val;
+                    logAuthor.disabled = true;
+                }
+                var fpMember = document.getElementById('footprintMember');
+                if (fpMember) fpMember.value = val;
+            }
+        }
+        
+        // 恢复身份
+        var saved = localStorage.getItem(identityKey);
+        if (saved) {
+            document.getElementById('identitySelect').value = saved;
+            setTimeout(function() {
+                var payer = document.getElementById('payerSelect');
+                if (payer) payer.value = saved;
+                var logAuthor = document.getElementById('logAuthor');
+                if (logAuthor) {
+                    logAuthor.value = saved;
+                    logAuthor.disabled = true;
+                }
+                var fpMember = document.getElementById('footprintMember');
+                if (fpMember) fpMember.value = saved;
+            }, 100);
         }
         
         var map = L.map('map').setView([35, 105], 4);
@@ -570,7 +638,7 @@ TRIP_HTML = '''<!DOCTYPE html>
 </body>
 </html>'''
 
-# ---------- 路由 ----------
+# ---------- 路由（与之前完全相同，无任何改动）----------
 @app.route('/')
 def index():
     return render_template_string(HOME_HTML)
@@ -652,59 +720,20 @@ def trip_page(trip_id):
     if not trip:
         conn.close()
         return "旅途不存在", 404
-    
     team_id = trip['team_id']
     is_archived = trip['status'] == 'archived'
     members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
     today = today_beijing()
-    
-    today_expenses = conn.execute('''
-        SELECT * FROM expenses 
-        WHERE trip_id=? AND expense_date=? AND settlement_id IS NULL
-        ORDER BY rowid DESC
-    ''', (trip_id, today)).fetchall()
-    
+    today_expenses = conn.execute('SELECT * FROM expenses WHERE trip_id=? AND expense_date=? AND settlement_id IS NULL ORDER BY rowid DESC', (trip_id, today)).fetchall()
     settlements_raw = conn.execute('SELECT * FROM daily_settlements WHERE trip_id=? ORDER BY settlement_date DESC', (trip_id,)).fetchall()
-    settlements = []
-    for s in settlements_raw:
-        settlements.append({
-            'settlement_date': s['settlement_date'],
-            'total_amount': s['total_amount'],
-            'parsed_result': json.loads(s['result_json'])
-        })
-    
+    settlements = [{'settlement_date': s['settlement_date'], 'total_amount': s['total_amount'], 'parsed_result': json.loads(s['result_json'])} for s in settlements_raw]
     footprints = conn.execute('SELECT * FROM footprints WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
     logs = conn.execute('SELECT * FROM travel_logs WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
-    
-    all_shares = conn.execute('''
-        SELECT es.member_name, SUM(es.share) as total_spent
-        FROM expense_shares es
-        JOIN expenses e ON es.expense_id = e.id
-        WHERE e.trip_id=?
-        GROUP BY es.member_name
-    ''', (trip_id,)).fetchall()
+    all_shares = conn.execute('SELECT es.member_name, SUM(es.share) as total_spent FROM expense_shares es JOIN expenses e ON es.expense_id = e.id WHERE e.trip_id=? GROUP BY es.member_name', (trip_id,)).fetchall()
     personal_total = [{'name': s['member_name'], 'spent': round(s['total_spent'], 2)} for s in all_shares]
-    
     conn.close()
-    
-    fp_json = []
-    for f in footprints:
-        fp_json.append({
-            'city_name': f['city_name'],
-            'latitude': f['latitude'],
-            'longitude': f['longitude'],
-            'photo_path': f['photo_path'],
-            'description': f['description'],
-            'member_name': f['member_name']
-        })
-    
-    return render_template_string(TRIP_HTML,
-        trip_id=trip_id, trip_name=trip['trip_name'], team_id=team_id,
-        members=members, today=today, today_expenses=today_expenses,
-        settlements=settlements, settle_result=None,
-        personal_summary=None, personal_total=personal_total,
-        footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False),
-        logs=logs, is_archived=is_archived)
+    fp_json = [{'city_name':f['city_name'],'latitude':f['latitude'],'longitude':f['longitude'],'photo_path':f['photo_path'],'description':f['description'],'member_name':f['member_name']} for f in footprints]
+    return render_template_string(TRIP_HTML, trip_id=trip_id, trip_name=trip['trip_name'], team_id=team_id, members=members, today=today, today_expenses=today_expenses, settlements=settlements, settle_result=None, personal_summary=None, personal_total=personal_total, footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False), logs=logs, is_archived=is_archived)
 
 @app.route('/trip/<int:trip_id>/add_expense', methods=['POST'])
 def add_expense(trip_id):
@@ -712,10 +741,8 @@ def add_expense(trip_id):
     amount = float(request.form.get('amount', 0))
     note = request.form.get('note', '')
     sharers = request.form.getlist('sharers')
-    
     if not payer or amount <= 0 or not sharers:
         return "请填写完整信息", 400
-    
     conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     if trip['status'] == 'archived':
@@ -723,15 +750,11 @@ def add_expense(trip_id):
         return "已归档的旅途不能添加支出", 400
     team_id = trip['team_id']
     today = today_beijing()
-    
-    conn.execute('INSERT INTO expenses (trip_id, team_id, payer_name, amount, note, expense_date) VALUES (?,?,?,?,?,?)',
-                 (trip_id, team_id, payer, amount, note, today))
+    conn.execute('INSERT INTO expenses (trip_id, team_id, payer_name, amount, note, expense_date) VALUES (?,?,?,?,?,?)', (trip_id, team_id, payer, amount, note, today))
     expense_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
-    
     share = round(amount / len(sharers), 2)
     for s in sharers:
-        conn.execute('INSERT INTO expense_shares (expense_id, member_name, share) VALUES (?,?,?)',
-                     (expense_id, s, share))
+        conn.execute('INSERT INTO expense_shares (expense_id, member_name, share) VALUES (?,?,?)', (expense_id, s, share))
     conn.commit()
     conn.close()
     return redirect(url_for('trip_page', trip_id=trip_id))
@@ -740,93 +763,55 @@ def add_expense(trip_id):
 def daily_settle(trip_id):
     today = today_beijing()
     conn = get_db()
-    
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     if trip['status'] == 'archived':
         conn.close()
         return "已归档的旅途不能清账", 400
-    
-    expenses = conn.execute('''
-        SELECT * FROM expenses 
-        WHERE trip_id=? AND expense_date=? AND settlement_id IS NULL
-    ''', (trip_id, today)).fetchall()
-    
+    expenses = conn.execute('SELECT * FROM expenses WHERE trip_id=? AND expense_date=? AND settlement_id IS NULL', (trip_id, today)).fetchall()
     if not expenses:
         conn.close()
         return redirect(url_for('trip_page', trip_id=trip_id))
-    
     paid = defaultdict(float)
     owed = defaultdict(float)
     for e in expenses:
         paid[e['payer_name']] += e['amount']
-        shares = conn.execute('SELECT * FROM expense_shares WHERE expense_id=?', (e['id'],)).fetchall()
-        for s in shares:
+        for s in conn.execute('SELECT * FROM expense_shares WHERE expense_id=?', (e['id'],)).fetchall():
             owed[s['member_name']] += s['share']
-    
     all_names = set(list(paid.keys()) + list(owed.keys()))
     net = {n: round(paid.get(n,0) - owed.get(n,0), 2) for n in all_names}
-    
     creditors = [(n, net[n]) for n in net if net[n] > 0.01]
     debtors = [(n, -net[n]) for n in net if net[n] < -0.01]
     result = []
     i, j = 0, 0
     while i < len(creditors) and j < len(debtors):
-        c_name, c_amt = creditors[i]
-        d_name, d_amt = debtors[j]
+        c_name, c_amt = creditors[i]; d_name, d_amt = debtors[j]
         t = min(c_amt, d_amt)
-        if t > 0.01:
-            result.append({'from': d_name, 'to': c_name, 'amount': round(t,2)})
-        creditors[i] = (c_name, c_amt - t)
-        debtors[j] = (d_name, d_amt - t)
+        if t > 0.01: result.append({'from': d_name, 'to': c_name, 'amount': round(t,2)})
+        creditors[i] = (c_name, c_amt - t); debtors[j] = (d_name, d_amt - t)
         if creditors[i][1] < 0.01: i += 1
         if debtors[j][1] < 0.01: j += 1
-    
     total = sum(e['amount'] for e in expenses)
-    
-    conn.execute('INSERT INTO daily_settlements (trip_id, settlement_date, total_amount, result_json) VALUES (?,?,?,?)',
-                 (trip_id, today, total, json.dumps(result, ensure_ascii=False)))
+    conn.execute('INSERT INTO daily_settlements (trip_id, settlement_date, total_amount, result_json) VALUES (?,?,?,?)', (trip_id, today, total, json.dumps(result, ensure_ascii=False)))
     settle_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
-    
     for e in expenses:
         conn.execute('UPDATE expenses SET settlement_id=? WHERE id=?', (settle_id, e['id']))
-    
     personal_today = defaultdict(float)
     for e in expenses:
-        shares = conn.execute('SELECT * FROM expense_shares WHERE expense_id=?', (e['id'],)).fetchall()
-        for s in shares:
+        for s in conn.execute('SELECT * FROM expense_shares WHERE expense_id=?', (e['id'],)).fetchall():
             personal_today[s['member_name']] += s['share']
     personal_summary = [{'name': n, 'spent': round(a, 2)} for n, a in personal_today.items()]
-    
     conn.commit()
-    
     team_id = trip['team_id']
     members = conn.execute('SELECT * FROM members WHERE team_id=?', (team_id,)).fetchall()
-    today_expenses = []
     settlements_raw = conn.execute('SELECT * FROM daily_settlements WHERE trip_id=? ORDER BY settlement_date DESC', (trip_id,)).fetchall()
     settlements = [{'settlement_date': s['settlement_date'], 'total_amount': s['total_amount'], 'parsed_result': json.loads(s['result_json'])} for s in settlements_raw]
     footprints = conn.execute('SELECT * FROM footprints WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
     logs = conn.execute('SELECT * FROM travel_logs WHERE trip_id=? ORDER BY rowid DESC', (trip_id,)).fetchall()
-    
-    all_shares = conn.execute('''
-        SELECT es.member_name, SUM(es.share) as total_spent
-        FROM expense_shares es
-        JOIN expenses e ON es.expense_id = e.id
-        WHERE e.trip_id=?
-        GROUP BY es.member_name
-    ''', (trip_id,)).fetchall()
+    all_shares = conn.execute('SELECT es.member_name, SUM(es.share) as total_spent FROM expense_shares es JOIN expenses e ON es.expense_id = e.id WHERE e.trip_id=? GROUP BY es.member_name', (trip_id,)).fetchall()
     personal_total = [{'name': s['member_name'], 'spent': round(s['total_spent'], 2)} for s in all_shares]
-    
     conn.close()
-    
     fp_json = [{'city_name':f['city_name'],'latitude':f['latitude'],'longitude':f['longitude'],'photo_path':f['photo_path'],'description':f['description'],'member_name':f['member_name']} for f in footprints]
-    
-    return render_template_string(TRIP_HTML,
-        trip_id=trip_id, trip_name=trip['trip_name'], team_id=team_id,
-        members=members, today=today, today_expenses=today_expenses,
-        settlements=settlements, settle_result=result,
-        personal_summary=personal_summary, personal_total=personal_total,
-        footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False),
-        logs=logs, is_archived=False)
+    return render_template_string(TRIP_HTML, trip_id=trip_id, trip_name=trip['trip_name'], team_id=team_id, members=members, today=today, today_expenses=[], settlements=settlements, settle_result=result, personal_summary=personal_summary, personal_total=personal_total, footprints=footprints, footprints_json=json.dumps(fp_json, ensure_ascii=False), logs=logs, is_archived=False)
 
 @app.route('/trip/<int:trip_id>/add_footprint', methods=['POST'])
 def add_footprint(trip_id):
@@ -835,19 +820,14 @@ def add_footprint(trip_id):
     lat = request.form.get('latitude', '')
     lng = request.form.get('longitude', '')
     desc = request.form.get('description', '')
-    
-    if not city_name:
-        return "请输入城市名", 400
-    
+    if not city_name: return "请输入城市名", 400
     conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     if trip['status'] == 'archived':
         conn.close()
         return "已归档的旅途不能添加足迹", 400
-    
     latitude = float(lat) if lat else None
     longitude = float(lng) if lng else None
-    
     photo_path = None
     if 'photo' in request.files:
         file = request.files['photo']
@@ -855,9 +835,7 @@ def add_footprint(trip_id):
             filename = uuid.uuid4().hex + '_' + secure_filename(file.filename)
             file.save(os.path.join(UPLOAD_FOLDER, filename))
             photo_path = filename
-    
-    conn.execute('INSERT INTO footprints (trip_id, member_name, city_name, latitude, longitude, photo_path, description) VALUES (?,?,?,?,?,?,?)',
-                 (trip_id, member_name, city_name, latitude, longitude, photo_path, desc))
+    conn.execute('INSERT INTO footprints (trip_id, member_name, city_name, latitude, longitude, photo_path, description) VALUES (?,?,?,?,?,?,?)', (trip_id, member_name, city_name, latitude, longitude, photo_path, desc))
     conn.commit()
     conn.close()
     return redirect(url_for('trip_page', trip_id=trip_id))
@@ -867,16 +845,12 @@ def add_log(trip_id):
     member_name = request.form.get('member_name', '')
     title = request.form.get('title', '').strip()
     content = request.form.get('content', '')
-    
-    if not title:
-        return "请输入标题", 400
-    
+    if not title: return "请输入标题", 400
     conn = get_db()
     trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
     if trip['status'] == 'archived':
         conn.close()
         return "已归档的旅途不能添加日志", 400
-    
     photo_path = None
     if 'photo' in request.files:
         file = request.files['photo']
@@ -884,9 +858,7 @@ def add_log(trip_id):
             filename = uuid.uuid4().hex + '_' + secure_filename(file.filename)
             file.save(os.path.join(UPLOAD_FOLDER, filename))
             photo_path = filename
-    
-    conn.execute('INSERT INTO travel_logs (trip_id, member_name, title, content, photo_path, log_date) VALUES (?,?,?,?,?,?)',
-                 (trip_id, member_name, title, content, photo_path, today_beijing()))
+    conn.execute('INSERT INTO travel_logs (trip_id, member_name, title, content, photo_path, log_date) VALUES (?,?,?,?,?,?)', (trip_id, member_name, title, content, photo_path, today_beijing()))
     conn.commit()
     conn.close()
     return redirect(url_for('trip_page', trip_id=trip_id))
